@@ -1003,8 +1003,9 @@
 
       const uploadedUrls = [];
       for (const file of files) {
-        if (file.size > 25 * 1024 * 1024) {
-          throw new Error(`File ${file.name} is larger than 25MB.`);
+        // 60MB limit to comfortably support 60-second video clips
+        if (file.size > 60 * 1024 * 1024) {
+          throw new Error(`File ${file.name} is larger than 60MB.`);
         }
         const ext = file.name.split('.').pop() || 'png';
         const fileName = `${folder}/${currentUser.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
@@ -1515,7 +1516,7 @@
       const query = document.getElementById('searchInput').value.trim();
       if (!query) return;
 
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewMemberList', 'viewAuthPortal'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch', 'viewMemberList', 'viewAuthPortal'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
       document.getElementById('viewSearch').classList.remove('hidden');
@@ -2152,21 +2153,22 @@
       safe = safe.replace(/\[quote=(.*?)D?\](.*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote by $1:</b><br/>$2</div>');
       safe = safe.replace(/\[quote\](.*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote:</b><br/>$1</div>');
 
-      // Parse Links, Images, and Videos
+      // Parse Links, Images, and Videos (Checking Images FIRST)
       return safe.replace(/(https?:\/\/[^\s<"]+)/g, url => {
         const cleanUrl = url.replace(/[.,!?;:)\]]+$/, '');
         const trailing = url.slice(cleanUrl.length);
         
-        // Render video inline if it's a video file extension
-        if (/\.(mp4|webm|mov|ogg)(\?.*)?$|/i.test(cleanUrl)) {
-          return `<video src="${cleanUrl}" class="post-embedded-video" controls preload="metadata"></video>${trailing}`;
-        }
-        
-        // Render image inline if it's an image file extension
-        if (/\.(jpg|jpeg|png|gif|webp)(\?.*)?$|/i.test(cleanUrl)) {
+        // 1. Check for images FIRST so image files render correctly as <img> tags
+        if (/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(cleanUrl)) {
           return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer"><img src="${cleanUrl}" class="post-embedded-img" alt="User posted image" /></a>${trailing}`;
         }
         
+        // 2. Check for video files
+        if (/\.(mp4|webm|mov|ogg)(\?.*)?$/i.test(cleanUrl)) {
+          return `<video src="${cleanUrl}" class="post-embedded-video" controls preload="metadata" muted playsinline></video>${trailing}`;
+        }
+        
+        // 3. Fallback: Render regular URLs as clean, clickable hyperlinks
         return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>${trailing}`;
       });
     }
