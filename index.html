@@ -723,8 +723,8 @@
           </div>
           <textarea id="threadBodyInput" rows="5" placeholder="Enter your message here..."></textarea>
           <div class="file-upload-row">
-            <label for="threadImageInput"><b>Attach Image (Optional):</b></label>
-            <input type="file" id="threadImageInput" accept="image/*" />
+            <label for="threadImageInput"><b>Attach Images (Optional, Multiple):</b></label>
+            <input type="file" id="threadImageInput" accept="image/*" multiple />
           </div>
           <button class="primary-btn" id="submitThreadBtn" onclick="createThread()">Submit New Thread</button>
           <button onclick="toggleNewThreadForm()">Cancel</button>
@@ -772,8 +772,8 @@
           </div>
           <textarea id="replyBodyInput" rows="4" placeholder="Write your reply to this thread..."></textarea>
           <div class="file-upload-row">
-            <label for="replyImageInput"><b>Attach Image (Optional):</b></label>
-            <input type="file" id="replyImageInput" accept="image/*" />
+            <label for="replyImageInput"><b>Attach Images (Optional, Multiple):</b></label>
+            <input type="file" id="replyImageInput" accept="image/*" multiple />
           </div>
           <button class="primary-btn" id="submitReplyBtn" onclick="postReply()">Post Reply</button>
           <button onclick="quoteLastPost()" type="button">Quote Last Post</button>
@@ -933,17 +933,27 @@
       }
     }
 
-    async function uploadImageToStorage(file, folder) {
-      if (!file) return null;
-      if (file.size > 5 * 1024 * 1024) throw new Error('Image must be smaller than 5MB.');
-      const ext = file.name.split('.').pop() || 'png';
-      const fileName = `${folder}/${currentUser.id}-${Date.now()}.${ext}`;
+    async function uploadMultipleImages(fileInput, folder) {
+      const files = fileInput.files;
+      if (!files || files.length === 0) return [];
 
-      const { error: uploadError } = await db.storage.from(BUCKET_NAME).upload(fileName, file, { upsert: true });
-      if (uploadError) throw uploadError;
+      const uploadedUrls = [];
+      for (const file of files) {
+        if (file.size > 5 * 1024 * 1024) {
+          throw new Error(`File ${file.name} is larger than 5MB.`);
+        }
+        const ext = file.name.split('.').pop() || 'png';
+        const fileName = `${folder}/${currentUser.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
 
-      const { data } = db.storage.from(BUCKET_NAME).getPublicUrl(fileName);
-      return data.publicUrl;
+        const { error: uploadError } = await db.storage.from(BUCKET_NAME).upload(fileName, file, { upsert: true });
+        if (uploadError) throw uploadError;
+
+        const { data } = db.storage.from(BUCKET_NAME).getPublicUrl(fileName);
+        if (data?.publicUrl) {
+          uploadedUrls.push(data.publicUrl);
+        }
+      }
+      return uploadedUrls;
     }
 
     function toggleProfileEditor() {
@@ -998,7 +1008,8 @@
         let avatarUrl = userProfiles[lKey]?.avatar_url || '';
         if (file) {
           status.textContent = 'Uploading new avatar...';
-          avatarUrl = await uploadImageToStorage(file, 'avatars');
+          const urls = await uploadMultipleImages(fileInput, 'avatars');
+          if (urls.length > 0) avatarUrl = urls[0];
         }
 
         const { error } = await db.from('profiles').upsert({
@@ -1756,9 +1767,8 @@
 
       const title = titleInput.value.trim();
       let body = bodyInput.value.trim();
-      const imageFile = imageInput.files[0];
 
-      if (!title || (!body && !imageFile)) {
+      if (!title || (!body && imageInput.files.length === 0)) {
         status.textContent = 'Please enter a thread title and a message or image.';
         return;
       }
@@ -1767,10 +1777,13 @@
       status.style.color = '#d35400';
 
       try {
-        if (imageFile) {
-          status.textContent = 'Uploading image...';
-          const imageUrl = await uploadImageToStorage(imageFile, 'posts');
-          body = body ? `${body}\n\n${imageUrl}` : imageUrl;
+        if (imageInput.files.length > 0) {
+          status.textContent = 'Uploading images...';
+          const imageUrls = await uploadMultipleImages(imageInput, 'posts');
+          if (imageUrls.length > 0) {
+            const joinedUrls = imageUrls.join('\n');
+            body = body ? `${body}\n\n${joinedUrls}` : joinedUrls;
+          }
         }
 
         const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
@@ -1986,17 +1999,19 @@
       const btn = document.getElementById('submitReplyBtn');
 
       let text = input.value.trim();
-      const imageFile = imageInput.files[0];
-      if (!text && !imageFile) return;
+      if (!text && imageInput.files.length === 0) return;
 
       btn.disabled = true;
       status.style.color = '#d35400';
 
       try {
-        if (imageFile) {
-          status.textContent = 'Uploading image...';
-          const imageUrl = await uploadImageToStorage(imageFile, 'posts');
-          text = text ? `${text}\n\n${imageUrl}` : imageUrl;
+        if (imageInput.files.length > 0) {
+          status.textContent = 'Uploading images...';
+          const imageUrls = await uploadMultipleImages(imageInput, 'posts');
+          if (imageUrls.length > 0) {
+            const joinedUrls = imageUrls.join('\n');
+            text = text ? `${text}\n\n${joinedUrls}` : joinedUrls;
+          }
         }
 
         const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
