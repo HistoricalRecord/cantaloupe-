@@ -339,6 +339,22 @@
     .auth-portal-body label { display: block; font-weight: bold; margin-bottom: 3px; font-size: 11px; color: #5a4a3f; }
     .auth-portal-body input { width: 100%; margin-bottom: 12px; padding: 6px; }
 
+    /* Checkbox Row for Remember Me */
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 12px;
+      font-size: 11px;
+      color: #5a4a3f;
+      cursor: pointer;
+    }
+    .checkbox-row input {
+      width: auto !important;
+      margin-bottom: 0 !important;
+      cursor: pointer;
+    }
+
     /* BBCode Bar */
     .bbcode-bar {
       display: flex;
@@ -514,6 +530,11 @@
           <input type="email" id="portalEmailInput" placeholder="your@email.com" />
           <label>Password:</label>
           <input type="password" id="portalPasswordInput" placeholder="••••••••" />
+          
+          <label class="checkbox-row">
+            <input type="checkbox" id="portalStayLoggedIn" checked /> Stay logged in on this device
+          </label>
+
           <button class="primary-btn" style="width:100%; margin-top:4px;" onclick="portalSignIn()">Log In to Forums</button>
         </div>
 
@@ -525,6 +546,11 @@
           <input type="email" id="portalRegEmailInput" placeholder="your@email.com" />
           <label>Password:</label>
           <input type="password" id="portalRegPasswordInput" placeholder="••••••••" />
+
+          <label class="checkbox-row">
+            <input type="checkbox" id="portalRegStayLoggedIn" checked /> Stay logged in on this device
+          </label>
+
           <button class="primary-btn" style="width:100%; margin-top:4px;" onclick="portalSignUp()">Create New Account</button>
         </div>
 
@@ -765,7 +791,16 @@
     const SUPABASE_URL = 'https://aeazovwgddsjzhvvifab.supabase.co';
     const SUPABASE_KEY = 'sb_publishable__2S12w5d3RXrN6EeKZbQxQ_Y87phSlJ';
     const BUCKET_NAME = 'forum-images';
-    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    // Initialize Supabase client with dynamic storage based on 'Stay logged in' preference
+    const stayLoggedInChecked = localStorage.getItem('cantaloupe_stay_logged') !== 'false';
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: {
+        storage: stayLoggedInChecked ? window.localStorage : window.sessionStorage,
+        persistSession: true,
+        autoRefreshToken: true
+      }
+    });
 
     const BOARDS = [
       { name: 'Misc/Anything', desc: 'General off-topic chatter, random thoughts, and anything else.' },
@@ -1034,15 +1069,26 @@
     async function portalSignIn() {
       const email = document.getElementById('portalEmailInput').value.trim();
       const password = document.getElementById('portalPasswordInput').value;
+      const stayLoggedIn = document.getElementById('portalStayLoggedIn').checked;
       const status = document.getElementById('authStatus');
-      status.style.color = '#c0392b';
+
+      localStorage.setItem('cantaloupe_stay_logged', stayLoggedIn);
+
+      status.style.color = '#d35400';
       status.textContent = 'Logging in...';
 
       const { error } = await db.auth.signInWithPassword({ email, password });
       if (error) {
+        status.style.color = '#c0392b';
         status.textContent = error.message;
       } else {
         status.textContent = '';
+        if (!stayLoggedIn) {
+          // If unchecked, move current session token to session storage so it clears on tab close
+          const currentSession = JSON.stringify(db.auth.getSession());
+          sessionStorage.setItem('supabase.auth.token', localStorage.getItem('supabase.auth.token'));
+        }
+        window.location.reload();
       }
     }
 
@@ -1050,15 +1096,21 @@
       const email = document.getElementById('portalRegEmailInput').value.trim();
       const password = document.getElementById('portalRegPasswordInput').value;
       const username = document.getElementById('portalRegUsernameInput').value.trim() || email.split('@')[0];
+      const stayLoggedIn = document.getElementById('portalRegStayLoggedIn').checked;
       const status = document.getElementById('authStatus');
+
+      localStorage.setItem('cantaloupe_stay_logged', stayLoggedIn);
+      status.style.color = '#d35400';
       status.textContent = 'Registering new account...';
 
       const { data, error } = await db.auth.signUp({ email, password, options: { data: { username } } });
       if (error) {
+        status.style.color = '#c0392b';
         status.textContent = error.message;
       } else {
         status.style.color = '#27ae60';
         status.textContent = data.session ? 'Registered and logged in successfully!' : 'Check your email to confirm your account.';
+        if (data.session) window.location.reload();
       }
     }
 
@@ -1541,6 +1593,7 @@
     }
 
     async function signOut() {
+      localStorage.removeItem('cantaloupe_stay_logged');
       await db.auth.signOut();
       currentUser = null;
       updateAuthState(null);
@@ -1998,7 +2051,7 @@
       return safe.replace(/(https?:\/\/[^\s<"]+)/g, url => {
         const cleanUrl = url.replace(/[.,!?;:)\]]+$/, '');
         const trailing = url.slice(cleanUrl.length);
-        if (/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(cleanUrl)) {
+        if (/\.(jpg|jpeg|png|gif|webp)(\?.*)?$|/i.test(cleanUrl)) {
           return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer"><img src="${cleanUrl}" class="post-embedded-img" alt="User posted image" /></a>${trailing}`;
         }
         return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>${trailing}`;
