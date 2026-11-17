@@ -266,6 +266,29 @@
       background: #fff9f5;
     }
 
+    /* Pagination Bar */
+    .pagination-bar {
+      padding: 8px 10px;
+      background: #fff9f2;
+      border-top: 1px solid #f3dcd1;
+      font-size: 11px;
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .pagination-bar a, .pagination-bar span {
+      padding: 2px 6px;
+      border: 1px solid #d3a081;
+      background: #fff;
+      color: #d35400;
+      font-weight: bold;
+    }
+    .pagination-bar span {
+      background: #e67e22;
+      color: #fff;
+      border-color: #ba4a00;
+    }
+
     /* Controls & Forms */
     input, textarea {
       font-family: Verdana, Tahoma, Arial, sans-serif;
@@ -461,6 +484,7 @@
       </div>
 
       <div id="threadPostsContainer"></div>
+      <div id="threadPaginationTop" class="pagination-bar"></div>
 
       <!-- Quick Reply Box -->
       <div id="replyFormBox" class="form-box hidden">
@@ -500,6 +524,9 @@
     let currentUser = null;
     let currentBoard = null;
     let currentThread = null;
+    let currentThreadPage = 1;
+    const POSTS_PER_PAGE = 50;
+
     let presenceChannel = null;
     let onlineUsernames = new Set();
     let userProfiles = {};
@@ -525,15 +552,15 @@
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'replies' }, (payload) => {
           if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread && payload.new?.thread_id === currentThread.id) {
-            openThread(currentThread.id);
+            openThread(currentThread.id, currentThreadPage);
           }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => {
-          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id);
+          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async () => {
           await loadProfiles();
-          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id);
+          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage);
         })
         .subscribe();
     }
@@ -633,7 +660,6 @@
         return;
       }
 
-      // Check if user already voted on this specific post/reply
       const { data: existing } = await db
         .from('votes')
         .select('*')
@@ -644,14 +670,11 @@
 
       if (existing) {
         if (existing.vote_type === voteType) {
-          // Clicking same vote removes it (toggle off)
           await db.from('votes').delete().eq('id', existing.id);
         } else {
-          // Switch vote type (-1 to 1 or 1 to -1)
           await db.from('votes').update({ vote_type: voteType }).eq('id', existing.id);
         }
       } else {
-        // Insert new vote using upsert semantics via unique constraint
         await db.from('votes').upsert({
           user_id: currentUser.id,
           target_id: targetId,
@@ -840,7 +863,7 @@
         const rowClass = idx % 2 === 0 ? 'row-odd' : 'row-even';
         return `
           <tr class="${rowClass}">
-            <td><a href="javascript:void(0)" onclick="openThread(${t.id})">${escapeHtml(t.title || 'Untitled Thread')}</a></td>
+            <td><a href="javascript:void(0)" onclick="openThread(${t.id}, 1)">${escapeHtml(t.title || 'Untitled Thread')}</a></td>
             <td>${escapeHtml(t.username || 'Member')}</td>
             <td class="center-col">${replyCount}</td>
             <td class="last-post-col">${formatDate(t.created_at)}</td>
@@ -898,7 +921,7 @@
         imageInput.value = '';
         status.textContent = '';
         document.getElementById('newThreadForm').classList.add('hidden');
-        openThread(data.id);
+        openThread(data.id, 1);
       } catch (err) {
         status.style.color = '#c0392b';
         status.textContent = err.message;
@@ -907,7 +930,7 @@
       }
     }
 
-    async function openThread(threadId) {
+    async function openThread(threadId, page = 1) {
       switchView('viewThread');
       await loadProfiles();
 
@@ -915,6 +938,7 @@
       if (error || !thread) return;
 
       currentThread = thread;
+      currentThreadPage = page;
       currentBoard = thread.category;
 
       document.getElementById('singleThreadTitle').textContent = thread.title || 'Untitled Thread';
@@ -930,6 +954,21 @@
         .eq('thread_id', threadId)
         .order('created_at', { ascending: true });
 
+      const allReplies = replies || [];
+      const totalPosts = 1 + allReplies.length;
+      const totalPages = Math.ceil(totalPosts / POSTS_PER_PAGE) || 1;
+
+      if (page > totalPages) page = totalPages;
+      if (page < 1) page = 1;
+
+      const allPosts = [
+        { ...thread, isOP: true, targetType: 'message', globalIndex: 1 },
+        ...allReplies.map((r, i) => ({ ...r, isOP: false, targetType: 'reply', globalIndex: i + 2 }))
+      ];
+
+      const startIndex = (page - 1) * POSTS_PER_PAGE;
+      const pagePosts = allPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
+
       const { data: allUserThreads } = await db.from('messages').select('username');
       const { data: allUserReplies } = await db.from('replies').select('username');
       const { data: allVotes } = await db.from('votes').select('*');
@@ -940,13 +979,8 @@
         counts[u] = (counts[u] || 0) + 1;
       });
 
-      const allPosts = [
-        { ...thread, isOP: true, targetType: 'message' },
-        ...(replies || []).map(r => ({ ...r, isOP: false, targetType: 'reply' }))
-      ];
-
       const container = document.getElementById('threadPostsContainer');
-      container.innerHTML = allPosts.map((p, index) => {
+      container.innerHTML = pagePosts.map((p) => {
         const uname = p.username || 'Member';
         const postCount = counts[uname] || 1;
         const isAdmin = uname.toLowerCase() === 'biggie';
@@ -972,7 +1006,7 @@
                   <span class="vote-score">${score}</span>
                   <button class="vote-btn" style="${downStyle}" onclick="castVote(${p.id}, '${p.targetType}', -1)">▼</button>
                 </div>
-                <span><b>#${index + 1}</b> ${p.isOP ? '(Thread Starter)' : ''}</span>
+                <span><b>#${p.globalIndex}</b> ${p.isOP ? '(Thread Starter)' : ''}</span>
               </div>
             </div>
             <table class="post-body-table">
@@ -998,6 +1032,20 @@
           </div>
         `;
       }).join('');
+
+      let paginationHtml = '';
+      if (totalPages > 1) {
+        paginationHtml += `<span>Pages (${totalPages}):</span>`;
+        for (let i = 1; i <= totalPages; i++) {
+          if (i === page) {
+            paginationHtml += `<span>${i}</span>`;
+          } else {
+            paginationHtml += `<a href="javascript:void(0)" onclick="openThread(${threadId}, ${i})">${i}</a>`;
+          }
+        }
+      }
+      document.getElementById('threadPaginationTop').innerHTML = paginationHtml;
+      document.getElementById('threadPaginationTop').classList.toggle('hidden', totalPages <= 1);
     }
 
     async function postReply() {
@@ -1036,7 +1084,11 @@
         input.value = '';
         imageInput.value = '';
         status.textContent = '';
-        await openThread(currentThread.id);
+
+        const { count } = await db.from('replies').select('*', { count: 'exact', head: true }).eq('thread_id', currentThread.id);
+        const finalPage = Math.ceil((count + 1) / POSTS_PER_PAGE);
+
+        await openThread(currentThread.id, finalPage);
       } catch (err) {
         status.style.color = '#c0392b';
         status.textContent = err.message;
