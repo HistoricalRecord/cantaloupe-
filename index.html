@@ -296,6 +296,47 @@
       text-align: center;
     }
 
+    /* Standalone Authentication Portal Screen */
+    .auth-portal-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 35px 15px;
+      background: #fff9f2;
+    }
+    .auth-portal-card {
+      width: 100%;
+      max-width: 420px;
+      background: #ffffff;
+      border: 1px solid #d3a081;
+      box-shadow: 0 3px 12px rgba(211, 84, 0, 0.08);
+      margin-bottom: 20px;
+    }
+    .auth-portal-tabs {
+      display: flex;
+      background: #fdebd0;
+      border-bottom: 1px solid #d3a081;
+    }
+    .auth-portal-tab {
+      flex: 1;
+      padding: 9px 4px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 11px;
+      cursor: pointer;
+      color: #78281f;
+      border-right: 1px solid #d3a081;
+    }
+    .auth-portal-tab:last-child { border-right: none; }
+    .auth-portal-tab.active {
+      background: #ffffff;
+      color: #d35400;
+      border-bottom: 1px solid #ffffff;
+    }
+    .auth-portal-body { padding: 18px; }
+    .auth-portal-body label { display: block; font-weight: bold; margin-bottom: 3px; font-size: 11px; color: #5a4a3f; }
+    .auth-portal-body input { width: 100%; margin-bottom: 12px; padding: 6px; }
+
     /* BBCode Bar */
     .bbcode-bar {
       display: flex;
@@ -417,7 +458,7 @@
   <div class="forum-wrapper">
     <!-- Top Header with Cantaloupe Home Button & Search -->
     <div class="top-banner">
-      <div class="banner-brand" onclick="showIndex()" title="Return to Cantaloupe Chat Home">
+      <div class="banner-brand" onclick="navigateHome()" title="Return to Cantaloupe Chat Home">
         <div class="cantaloupe-logo">🍈</div>
         <div>
           <div class="site-title">CANTALOUPE CHAT</div>
@@ -427,19 +468,15 @@
       <div class="banner-search">
         <input type="text" id="searchInput" placeholder="Search forums..." style="width:130px; height:24px;" />
         <button onclick="performSearch()">Search</button>
-        <button onclick="showIndex()">Home</button>
+        <button onclick="navigateHome()">Home</button>
       </div>
     </div>
 
     <!-- User / Auth Bar -->
     <div class="user-bar">
-      <div id="welcomeText">Welcome, <b>Guest</b>! Please log in or register to post threads and replies.</div>
-      <div id="loggedOutControls" style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
-        <input type="text" id="usernameInput" placeholder="Username (Register)" style="width:120px;" />
-        <input type="email" id="emailInput" placeholder="Email" style="width:130px;" />
-        <input type="password" id="passwordInput" placeholder="Password" style="width:100px;" />
-        <button onclick="signIn()">Log In</button>
-        <button onclick="signUp()">Register</button>
+      <div id="welcomeText">Welcome, <b>Guest</b>! Please log in or register below.</div>
+      <div id="loggedOutControls" class="hidden" style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
+        <span style="font-size:10px; color:#d35400; font-weight:bold;">Use auth portal below &rarr;</span>
       </div>
       <div id="loggedInControls" class="hidden" style="display:flex; gap:6px; align-items:center;">
         <button id="inboxBtn" onclick="openInbox()">Inbox (0)</button>
@@ -451,8 +488,54 @@
 
     <!-- Breadcrumb Bar -->
     <div class="breadcrumb" id="breadcrumbNav">
-      <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a>
+      <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Portal</a>
       <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
+    </div>
+
+    <!-- AUTHENTICATION PORTAL (HOME PAGE WHEN LOGGED OUT) -->
+    <div id="viewAuthPortal" class="auth-portal-container hidden">
+      <div style="text-align:center; margin-bottom:20px;">
+        <h2 style="color:#d35400; margin:0 0 6px 0; font-size:19px;">Welcome to Cantaloupe Chat</h2>
+        <p style="font-size:11px; color:#6e655f; margin:0;">Please log into your account or register to join the community message boards.</p>
+      </div>
+
+      <div class="auth-portal-card">
+        <div class="auth-portal-tabs">
+          <div id="tabLoginBtn" class="auth-portal-tab active" onclick="switchPortalTab('login')">Log In</div>
+          <div id="tabRegisterBtn" class="auth-portal-tab" onclick="switchPortalTab('register')">Register</div>
+          <div id="tabForgotBtn" class="auth-portal-tab" onclick="switchPortalTab('forgot')">Forgot Password</div>
+        </div>
+
+        <!-- Tab 1: Log In -->
+        <div id="portalTabLogin" class="auth-portal-body">
+          <label>Email Address:</label>
+          <input type="email" id="portalEmailInput" placeholder="your@email.com" />
+          <label>Password:</label>
+          <input type="password" id="portalPasswordInput" placeholder="••••••••" />
+          <button class="primary-btn" style="width:100%; margin-top:4px;" onclick="portalSignIn()">Log In to Forums</button>
+        </div>
+
+        <!-- Tab 2: Register -->
+        <div id="portalTabRegister" class="auth-portal-body hidden">
+          <label>Desired Username:</label>
+          <input type="text" id="portalRegUsernameInput" placeholder="CantaloupeFan99" />
+          <label>Email Address:</label>
+          <input type="email" id="portalRegEmailInput" placeholder="your@email.com" />
+          <label>Password:</label>
+          <input type="password" id="portalRegPasswordInput" placeholder="••••••••" />
+          <button class="primary-btn" style="width:100%; margin-top:4px;" onclick="portalSignUp()">Create New Account</button>
+        </div>
+
+        <!-- Tab 3: Forgot Password -->
+        <div id="portalTabForgot" class="auth-portal-body hidden">
+          <p style="font-size:11px; color:#5a4a3f; margin-top:0; line-height:1.4;">
+            Forgot your password? Enter your account email address below, and we will send you a secure link to reset your password.
+          </p>
+          <label>Account Email Address:</label>
+          <input type="email" id="portalForgotEmailInput" placeholder="your@email.com" />
+          <button class="primary-btn" style="width:100%; margin-top:4px;" onclick="portalSendPasswordReset()">Send Reset Instructions</button>
+        </div>
+      </div>
     </div>
 
     <!-- PRIVATE MESSAGING VIEW -->
@@ -561,7 +644,7 @@
       </table>
     </div>
 
-    <!-- VIEW 1: FORUM INDEX -->
+    <!-- VIEW 1: FORUM INDEX (HOME PAGE WHEN LOGGED IN) -->
     <div id="viewIndex">
       <table class="forum-table">
         <thead>
@@ -713,8 +796,12 @@
       await loadProfiles();
       await loadIgnoredUsers();
       setupPresence();
-      await showIndex();
-      if (currentUser) updateInboxCount();
+      if (currentUser) {
+        await showIndex();
+        updateInboxCount();
+      } else {
+        showAuthPortal();
+      }
 
       db.channel('forum-realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
@@ -809,13 +896,13 @@
       return data.publicUrl;
     }
 
-    async function toggleProfileEditor() {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewInbox', 'viewSearch', 'viewMemberList'].forEach(id => {
+    function toggleProfileEditor() {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewInbox', 'viewSearch', 'viewMemberList', 'viewAuthPortal'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
       document.getElementById('viewProfileEditor').classList.remove('hidden');
       document.getElementById('breadcrumbNav').innerHTML = `
-        <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; <b>Edit Profile</b>
+        <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Index</a> &raquo; <b>Edit Profile</b>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
@@ -878,7 +965,7 @@
         status.style.color = '#27ae60';
         status.textContent = 'Profile updated successfully!';
         fileInput.value = '';
-        setTimeout(() => { showIndex(); }, 1200);
+        setTimeout(() => { navigateHome(); }, 1200);
       } catch (err) {
         status.style.color = '#c0392b';
         status.textContent = err.message;
@@ -917,6 +1004,73 @@
       replyTa.focus();
     }
 
+    // Auth Portal Tab Switcher
+    function switchPortalTab(tab) {
+      document.getElementById('portalTabLogin').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('portalTabRegister').classList.toggle('hidden', tab !== 'register');
+      document.getElementById('portalTabForgot').classList.toggle('hidden', tab !== 'forgot');
+
+      document.getElementById('tabLoginBtn').classList.toggle('active', tab === 'login');
+      document.getElementById('tabRegisterBtn').classList.toggle('active', tab === 'register');
+      document.getElementById('tabForgotBtn').classList.toggle('active', tab === 'forgot');
+      document.getElementById('authStatus').textContent = '';
+    }
+
+    async function portalSignIn() {
+      const email = document.getElementById('portalEmailInput').value.trim();
+      const password = document.getElementById('portalPasswordInput').value;
+      const status = document.getElementById('authStatus');
+      status.style.color = '#c0392b';
+      status.textContent = 'Logging in...';
+
+      const { error } = await db.auth.signInWithPassword({ email, password });
+      if (error) {
+        status.textContent = error.message;
+      } else {
+        status.textContent = '';
+      }
+    }
+
+    async function portalSignUp() {
+      const email = document.getElementById('portalRegEmailInput').value.trim();
+      const password = document.getElementById('portalRegPasswordInput').value;
+      const username = document.getElementById('portalRegUsernameInput').value.trim() || email.split('@')[0];
+      const status = document.getElementById('authStatus');
+      status.textContent = 'Registering new account...';
+
+      const { data, error } = await db.auth.signUp({ email, password, options: { data: { username } } });
+      if (error) {
+        status.textContent = error.message;
+      } else {
+        status.style.color = '#27ae60';
+        status.textContent = data.session ? 'Registered and logged in successfully!' : 'Check your email to confirm your account.';
+      }
+    }
+
+    async function portalSendPasswordReset() {
+      const email = document.getElementById('portalForgotEmailInput').value.trim();
+      const status = document.getElementById('authStatus');
+      if (!email) {
+        status.style.color = '#c0392b';
+        status.textContent = 'Please enter your account email address.';
+        return;
+      }
+      status.style.color = '#d35400';
+      status.textContent = 'Sending password reset link...';
+
+      const { error } = await db.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.href
+      });
+
+      if (error) {
+        status.style.color = '#c0392b';
+        status.textContent = error.message;
+      } else {
+        status.style.color = '#27ae60';
+        status.textContent = 'Password reset instructions sent! Check your email inbox.';
+      }
+    }
+
     // Post Reporting
     async function reportPost(targetId, targetType) {
       if (!currentUser) {
@@ -948,12 +1102,12 @@
 
     // Member Directory
     async function openMemberList() {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewSearch', 'viewInbox'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewSearch', 'viewInbox', 'viewAuthPortal'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
       document.getElementById('viewMemberList').classList.remove('hidden');
       document.getElementById('breadcrumbNav').innerHTML = `
-        <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; <b>Member Directory</b>
+        <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>Member Directory</b>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
@@ -997,7 +1151,7 @@
     }
 
     async function openInbox() {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewSearch', 'viewMemberList'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewSearch', 'viewMemberList', 'viewAuthPortal'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
       document.getElementById('viewInbox').classList.remove('hidden');
@@ -1006,7 +1160,7 @@
       document.getElementById('pmTable').classList.remove('hidden');
 
       document.getElementById('breadcrumbNav').innerHTML = `
-        <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; <b>Private Messages</b>
+        <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>Private Messages</b>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
@@ -1113,12 +1267,12 @@
       const query = document.getElementById('searchInput').value.trim();
       if (!query) return;
 
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewMemberList'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewMemberList', 'viewAuthPortal'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
       document.getElementById('viewSearch').classList.remove('hidden');
       document.getElementById('breadcrumbNav').innerHTML = `
-        <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; <b>Search: ${escapeHtml(query)}</b>
+        <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>Search: ${escapeHtml(query)}</b>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
@@ -1265,7 +1419,7 @@
         updateInboxCount();
         loadIgnoredUsers();
       } else {
-        welcome.innerHTML = `Welcome, <b>Guest</b>! Please log in or register to post threads and replies.`;
+        welcome.innerHTML = `Welcome, <b>Guest</b>! Please log in or register below.`;
         ignoredUsers = new Set();
       }
       document.getElementById('loggedOutControls').classList.toggle('hidden', !!user);
@@ -1273,54 +1427,55 @@
       document.getElementById('newThreadBtn').classList.toggle('hidden', !user);
       document.getElementById('replyFormBox').classList.toggle('hidden', !user);
       if (!user) document.getElementById('newThreadForm').classList.add('hidden');
-    }
 
-    async function signUp() {
-      const email = document.getElementById('emailInput').value.trim();
-      const password = document.getElementById('passwordInput').value;
-      const username = document.getElementById('usernameInput').value.trim() || email.split('@')[0];
-      const status = document.getElementById('authStatus');
-      status.textContent = 'Registering...';
-
-      const { data, error } = await db.auth.signUp({ email, password, options: { data: { username } } });
-      if (error) {
-        status.textContent = error.message;
+      if (!user) {
+        showAuthPortal();
       } else {
-        status.style.color = '#27ae60';
-        status.textContent = data.session ? 'Registered and logged in!' : 'Check your email to confirm your account.';
+        showIndex();
       }
-    }
-
-    async function signIn() {
-      const email = document.getElementById('emailInput').value.trim();
-      const password = document.getElementById('passwordInput').value;
-      const status = document.getElementById('authStatus');
-      status.style.color = '#c0392b';
-      status.textContent = 'Logging in...';
-
-      const { error } = await db.auth.signInWithPassword({ email, password });
-      status.textContent = error ? error.message : '';
     }
 
     async function signOut() {
       await db.auth.signOut();
       currentUser = null;
       updateAuthState(null);
-      showIndex();
+      showAuthPortal();
     }
 
     function switchView(viewId) {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch', 'viewMemberList'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch', 'viewMemberList', 'viewAuthPortal'].forEach(id => {
         document.getElementById(id).classList.toggle('hidden', id !== viewId);
       });
     }
 
+    function showAuthPortal() {
+      currentBoard = null;
+      currentThread = null;
+      switchView('viewAuthPortal');
+      document.getElementById('breadcrumbNav').innerHTML = `
+        <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Portal</a>
+        <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
+      `;
+    }
+
+    function navigateHome() {
+      if (currentUser) {
+        showIndex();
+      } else {
+        showAuthPortal();
+      }
+    }
+
     async function showIndex() {
+      if (!currentUser) {
+        showAuthPortal();
+        return;
+      }
       currentBoard = null;
       currentThread = null;
       switchView('viewIndex');
       document.getElementById('breadcrumbNav').innerHTML = `
-        <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a>
+        <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Forum Index</a>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
@@ -1368,12 +1523,13 @@
     }
 
     async function openBoard(boardName) {
+      if (!currentUser) { showAuthPortal(); return; }
       currentBoard = boardName;
       currentThread = null;
       switchView('viewBoard');
       document.getElementById('currentBoardTitle').textContent = boardName;
       document.getElementById('breadcrumbNav').innerHTML = `
-        <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; <b>${escapeHtml(boardName)}</b>
+        <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Forum Index</a> &raquo; <b>${escapeHtml(boardName)}</b>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
@@ -1492,6 +1648,7 @@
     }
 
     async function openThread(threadId, page = 1) {
+      if (!currentUser) { showAuthPortal(); return; }
       switchView('viewThread');
       await loadProfiles();
 
@@ -1504,7 +1661,7 @@
 
       document.getElementById('singleThreadTitle').textContent = thread.title || 'Untitled Thread';
       document.getElementById('breadcrumbNav').innerHTML = `
-        <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; 
+        <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Forum Index</a> &raquo; 
         <a href="javascript:void(0)" onclick="openBoard('${escapeHtml(thread.category)}')">${escapeHtml(thread.category)}</a> &raquo; 
         <b>${escapeHtml(thread.title || 'Thread')}</b>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
