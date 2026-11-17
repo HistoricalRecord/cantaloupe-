@@ -10,51 +10,69 @@
     body {
       margin: 0;
       padding: 10px;
-      background-color: #d9dee4;
-      color: #111111;
+      background-color: #fff4ea;
+      color: #2d2a26;
       font-family: Verdana, Tahoma, Arial, sans-serif;
       font-size: 12px;
     }
-    a { color: #1b4d89; text-decoration: none; font-weight: bold; }
-    a:hover { text-decoration: underline; color: #cc5500; }
+    a { color: #d35400; text-decoration: none; font-weight: bold; }
+    a:hover { text-decoration: underline; color: #e67e22; }
 
     .forum-wrapper {
       max-width: 900px;
       margin: 0 auto;
       background: #ffffff;
-      border: 1px solid #6b7b8c;
+      border: 1px solid #e0b492;
+      box-shadow: 0 4px 16px rgba(255, 140, 66, 0.08);
     }
 
-    /* 2005 Classic Banner */
+    /* Cantaloupe Orange 2005 Banner */
     .top-banner {
-      background: linear-gradient(180deg, #2b4c7e 0%, #1a3154 100%);
+      background: linear-gradient(180deg, #ff9f43 0%, #e67e22 100%);
       color: #ffffff;
-      padding: 14px 16px;
-      border-bottom: 3px solid #e67e22;
+      padding: 12px 16px;
+      border-bottom: 3px solid #d35400;
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
       gap: 10px;
     }
+    .banner-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .cantaloupe-logo {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
     .site-title {
       font-size: 20px;
       font-weight: bold;
       letter-spacing: 0.5px;
       color: #ffffff;
-      text-shadow: 1px 1px 2px #000000;
-      cursor: pointer;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
     }
     .site-subtitle {
       font-size: 10px;
-      color: #cfdbe8;
+      color: #fdebd0;
       margin-top: 2px;
     }
 
     /* Sub-header / User Bar */
     .user-bar {
-      background: #eef2f6;
-      border-bottom: 1px solid #9aa8b8;
+      background: #fff9f2;
+      border-bottom: 1px solid #e8ccc0;
       padding: 8px 12px;
       display: flex;
       justify-content: space-between;
@@ -64,54 +82,54 @@
       font-size: 11px;
     }
     .breadcrumb {
-      background: #f7f9fb;
-      border-bottom: 1px solid #b8c4d0;
+      background: #fdf5ef;
+      border-bottom: 1px solid #f3dcd1;
       padding: 7px 12px;
       font-size: 11px;
     }
 
-    /* Classic Forum Tables */
+    /* Classic Forum Tables with Cantaloupe Accents */
     table.forum-table {
       width: 100%;
       border-collapse: collapse;
     }
     table.forum-table th {
-      background: linear-gradient(180deg, #4b6c9e 0%, #314b73 100%);
+      background: linear-gradient(180deg, #f39c12 0%, #d35400 100%);
       color: #ffffff;
       text-align: left;
       padding: 7px 10px;
       font-size: 11px;
-      border: 1px solid #2b4163;
+      border: 1px solid #ba4a00;
     }
     table.forum-table td {
       padding: 9px 10px;
-      border: 1px solid #c5cfd9;
+      border: 1px solid #f3dcd1;
       vertical-align: middle;
     }
-    tr.row-even td { background-color: #f4f7fa; }
+    tr.row-even td { background-color: #fff9f5; }
     tr.row-odd td { background-color: #ffffff; }
-    tr.row-even:hover td, tr.row-odd:hover td { background-color: #e9eff5; }
+    tr.row-even:hover td, tr.row-odd:hover td { background-color: #fdebd0; }
 
     .board-desc {
       font-size: 10px;
-      color: #555555;
+      color: #6e655f;
       margin-top: 3px;
     }
     .center-col { text-align: center; width: 70px; }
-    .last-post-col { width: 190px; font-size: 10px; color: #333333; }
+    .last-post-col { width: 190px; font-size: 10px; color: #4a423d; }
 
     /* Classic Post Layout (2-Column User Info + Message) */
     .post-box {
-      border: 1px solid #8c9ba8;
+      border: 1px solid #e0b492;
       margin: 10px;
       background: #ffffff;
     }
     .post-header {
-      background: #cfd9e4;
-      border-bottom: 1px solid #8c9ba8;
+      background: #fdebd0;
+      border-bottom: 1px solid #e0b492;
       padding: 5px 10px;
       font-size: 10px;
-      color: #222222;
+      color: #5a4a3f;
       display: flex;
       justify-content: space-between;
     }
@@ -121,8 +139,8 @@
     }
     .post-author-cell {
       width: 150px;
-      background: #eef2f6;
-      border-right: 1px solid #c5cfd9;
+      background: #fff9f2;
+      border-right: 1px solid #f3dcd1;
       padding: 10px;
       vertical-align: top;
       font-size: 11px;
@@ -130,13 +148,13 @@
     .author-name {
       font-weight: bold;
       font-size: 12px;
-      color: #1b4d89;
+      color: #d35400;
       margin-bottom: 4px;
       word-break: break-word;
     }
     .author-rank {
       font-size: 10px;
-      color: #555555;
+      color: #7a7267;
     }
     .post-content-cell {
       padding: 12px;
@@ -151,34 +169,34 @@
       font-family: Verdana, Tahoma, Arial, sans-serif;
       font-size: 11px;
       padding: 5px;
-      border: 1px solid #7f9db9;
+      border: 1px solid #d3a081;
       background: #ffffff;
     }
     button {
       font-family: Verdana, Tahoma, Arial, sans-serif;
       font-size: 11px;
       font-weight: bold;
-      background: #e1e7ee;
-      border: 1px solid #6b7b8c;
-      color: #111111;
+      background: #fae5d3;
+      border: 1px solid #d3a081;
+      color: #78281f;
       padding: 4px 10px;
       cursor: pointer;
     }
-    button:hover { background: #cfd9e4; }
+    button:hover { background: #fdebd0; }
     button.primary-btn {
-      background: #2b4c7e;
+      background: #e67e22;
       color: #ffffff;
-      border-color: #1a3154;
+      border-color: #ba4a00;
     }
-    button.primary-btn:hover { background: #1a3154; }
+    button.primary-btn:hover { background: #d35400; }
 
     .form-box {
       margin: 10px;
-      border: 1px solid #8c9ba8;
-      background: #f4f7fa;
+      border: 1px solid #e0b492;
+      background: #fff9f5;
     }
     .form-box-header {
-      background: #314b73;
+      background: #f39c12;
       color: #ffffff;
       padding: 6px 10px;
       font-weight: bold;
@@ -191,14 +209,14 @@
     }
 
     .hidden { display: none !important; }
-    .status-msg { color: #b00020; font-weight: bold; font-size: 11px; margin-top: 5px; }
+    .status-msg { color: #c0392b; font-weight: bold; font-size: 11px; margin-top: 5px; }
     .footer-bar {
-      background: #eef2f6;
-      border-top: 1px solid #9aa8b8;
+      background: #fff9f2;
+      border-top: 1px solid #e8ccc0;
       padding: 8px;
       text-align: center;
       font-size: 10px;
-      color: #555555;
+      color: #7a7267;
     }
 
     @media (max-width: 600px) {
@@ -209,11 +227,14 @@
 </head>
 <body>
   <div class="forum-wrapper">
-    <!-- Top Header -->
+    <!-- Top Header with Cantaloupe Image/Logo -->
     <div class="top-banner">
-      <div onclick="showIndex()">
-        <div class="site-title">CANTALOUPE CHAT</div>
-        <div class="site-subtitle">Official Community Message Boards &bull; Est. 2026</div>
+      <div class="banner-brand" onclick="showIndex()">
+        <div class="cantaloupe-logo">🍈</div>
+        <div>
+          <div class="site-title">CANTALOUPE CHAT</div>
+          <div class="site-subtitle">Official Community Message Boards &bull; Est. 2026</div>
+        </div>
       </div>
       <div>
         <button onclick="showIndex()">Board Index</button>
@@ -260,8 +281,8 @@
 
     <!-- VIEW 2: THREAD LIST FOR SELECTED BOARD -->
     <div id="viewBoard" class="hidden">
-      <div style="padding: 8px 10px; display:flex; justify-content:space-between; align-items:center; background:#f7f9fb; border-bottom:1px solid #c5cfd9;">
-        <strong id="currentBoardTitle" style="font-size:13px;">Board Name</strong>
+      <div style="padding: 8px 10px; display:flex; justify-content:space-between; align-items:center; background:#fff9f2; border-bottom:1px solid #f3dcd1;">
+        <strong id="currentBoardTitle" style="font-size:13px; color:#d35400;">Board Name</strong>
         <button id="newThreadBtn" class="primary-btn hidden" onclick="toggleNewThreadForm()">+ New Thread</button>
       </div>
 
@@ -292,8 +313,8 @@
 
     <!-- VIEW 3: SINGLE THREAD & ALL REPLIES -->
     <div id="viewThread" class="hidden">
-      <div style="padding: 8px 10px; background:#f7f9fb; border-bottom:1px solid #c5cfd9; display:flex; justify-content:space-between; align-items:center;">
-        <strong id="singleThreadTitle" style="font-size:13px;">Thread Title</strong>
+      <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1; display:flex; justify-content:space-between; align-items:center;">
+        <strong id="singleThreadTitle" style="font-size:13px; color:#d35400;">Thread Title</strong>
         <button onclick="openBoard(currentBoard)">&laquo; Back to Board</button>
       </div>
 
@@ -311,7 +332,7 @@
     </div>
 
     <div class="footer-bar">
-      Powered by Cantaloupe Chat &bull; Classic Forum Layout &bull; All times local
+      Powered by Cantaloupe Chat &bull; Classic 2005 Forum Layout &bull; All times local
     </div>
   </div>
 
@@ -344,7 +365,6 @@
 
       await showIndex();
 
-      // Real-time updates for new threads and replies
       db.channel('forum-realtime')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
           if (!document.getElementById('viewIndex').classList.contains('hidden')) showIndex();
@@ -391,7 +411,7 @@
       if (error) {
         status.textContent = error.message;
       } else {
-        status.style.color = '#1b5e20';
+        status.style.color = '#27ae60';
         status.textContent = data.session ? 'Registered and logged in!' : 'Check your email to confirm your account.';
       }
     }
@@ -400,7 +420,7 @@
       const email = document.getElementById('emailInput').value.trim();
       const password = document.getElementById('passwordInput').value;
       const status = document.getElementById('authStatus');
-      status.style.color = '#b00020';
+      status.style.color = '#c0392b';
       status.textContent = 'Logging in...';
 
       const { error } = await db.auth.signInWithPassword({ email, password });
@@ -436,7 +456,6 @@
         const threadIds = new Set(boardThreads.map(t => t.id));
         const boardReplies = allReplies.filter(r => threadIds.has(r.thread_id));
 
-        // Find latest activity
         let lastText = 'No posts yet';
         const combined = [
           ...boardThreads.map(t => ({ user: t.username, time: t.created_at, title: t.title })),
