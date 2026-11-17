@@ -270,7 +270,6 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
-    /* Fixed Hyperlink Styling: Clean 2005 Forum Link Look */
     .post-content-cell a { 
       color: #1b4d89 !important; 
       text-decoration: underline !important; 
@@ -287,6 +286,15 @@
       border: 1px solid #e0b492;
       padding: 3px;
       background: #fff9f5;
+    }
+    .post-embedded-video {
+      display: block;
+      max-width: 100%;
+      max-height: 450px;
+      margin-top: 8px;
+      border: 1px solid #e0b492;
+      padding: 3px;
+      background: #000000;
     }
     .post-signature {
       margin-top: 16px;
@@ -730,8 +738,8 @@
           </div>
           <textarea id="threadBodyInput" rows="5" placeholder="Enter your message here..."></textarea>
           <div class="file-upload-row">
-            <label for="threadImageInput"><b>Attach Images (Optional, Multiple):</b></label>
-            <input type="file" id="threadImageInput" accept="image/*" multiple />
+            <label for="threadImageInput"><b>Attach Media (Images/Videos, Multiple):</b></label>
+            <input type="file" id="threadImageInput" accept="image/*,video/*" multiple />
           </div>
           <button class="primary-btn" id="submitThreadBtn" onclick="createThread()">Submit New Thread</button>
           <button onclick="toggleNewThreadForm()">Cancel</button>
@@ -779,8 +787,8 @@
           </div>
           <textarea id="replyBodyInput" rows="4" placeholder="Write your reply to this thread..."></textarea>
           <div class="file-upload-row">
-            <label for="replyImageInput"><b>Attach Images (Optional, Multiple):</b></label>
-            <input type="file" id="replyImageInput" accept="image/*" multiple />
+            <label for="replyImageInput"><b>Attach Media (Images/Videos, Multiple):</b></label>
+            <input type="file" id="replyImageInput" accept="image/*,video/*" multiple />
           </div>
           <button class="primary-btn" id="submitReplyBtn" onclick="postReply()">Post Reply</button>
           <button onclick="quoteLastPost()" type="button">Quote Last Post</button>
@@ -995,8 +1003,8 @@
 
       const uploadedUrls = [];
       for (const file of files) {
-        if (file.size > 5 * 1024 * 1024) {
-          throw new Error(`File ${file.name} is larger than 5MB.`);
+        if (file.size > 25 * 1024 * 1024) {
+          throw new Error(`File ${file.name} is larger than 25MB.`);
         }
         const ext = file.name.split('.').pop() || 'png';
         const fileName = `${folder}/${currentUser.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
@@ -1843,7 +1851,7 @@
       let body = bodyInput.value.trim();
 
       if (!title || (!body && imageInput.files.length === 0)) {
-        status.textContent = 'Please enter a thread title and a message or image.';
+        status.textContent = 'Please enter a thread title and a message or media file.';
         return;
       }
 
@@ -1852,10 +1860,10 @@
 
       try {
         if (imageInput.files.length > 0) {
-          status.textContent = 'Uploading images...';
-          const imageUrls = await uploadMultipleImages(imageInput, 'posts');
-          if (imageUrls.length > 0) {
-            const joinedUrls = imageUrls.join('\n');
+          status.textContent = 'Uploading media files...';
+          const mediaUrls = await uploadMultipleImages(imageInput, 'posts');
+          if (mediaUrls.length > 0) {
+            const joinedUrls = mediaUrls.join('\n');
             body = body ? `${body}\n\n${joinedUrls}` : joinedUrls;
           }
         }
@@ -2084,10 +2092,10 @@
 
       try {
         if (imageInput.files.length > 0) {
-          status.textContent = 'Uploading images...';
-          const imageUrls = await uploadMultipleImages(imageInput, 'posts');
-          if (imageUrls.length > 0) {
-            const joinedUrls = imageUrls.join('\n');
+          status.textContent = 'Uploading media files...';
+          const mediaUrls = await uploadMultipleImages(imageInput, 'posts');
+          if (mediaUrls.length > 0) {
+            const joinedUrls = mediaUrls.join('\n');
             text = text ? `${text}\n\n${joinedUrls}` : joinedUrls;
           }
         }
@@ -2144,13 +2152,21 @@
       safe = safe.replace(/\[quote=(.*?)D?\](.*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote by $1:</b><br/>$2</div>');
       safe = safe.replace(/\[quote\](.*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote:</b><br/>$1</div>');
 
-      // Parse Links & Images
+      // Parse Links, Images, and Videos
       return safe.replace(/(https?:\/\/[^\s<"]+)/g, url => {
         const cleanUrl = url.replace(/[.,!?;:)\]]+$/, '');
         const trailing = url.slice(cleanUrl.length);
+        
+        // Render video inline if it's a video file extension
+        if (/\.(mp4|webm|mov|ogg)(\?.*)?$|/i.test(cleanUrl)) {
+          return `<video src="${cleanUrl}" class="post-embedded-video" controls preload="metadata"></video>${trailing}`;
+        }
+        
+        // Render image inline if it's an image file extension
         if (/\.(jpg|jpeg|png|gif|webp)(\?.*)?$|/i.test(cleanUrl)) {
           return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer"><img src="${cleanUrl}" class="post-embedded-img" alt="User posted image" /></a>${trailing}`;
         }
+        
         return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>${trailing}`;
       });
     }
