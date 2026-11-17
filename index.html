@@ -1084,8 +1084,6 @@
       } else {
         status.textContent = '';
         if (!stayLoggedIn) {
-          // If unchecked, move current session token to session storage so it clears on tab close
-          const currentSession = JSON.stringify(db.auth.getSession());
           sessionStorage.setItem('supabase.auth.token', localStorage.getItem('supabase.auth.token'));
         }
         window.location.reload();
@@ -1101,16 +1099,24 @@
 
       localStorage.setItem('cantaloupe_stay_logged', stayLoggedIn);
       status.style.color = '#d35400';
-      status.textContent = 'Registering new account...';
+      status.textContent = 'Creating account...';
 
-      const { data, error } = await db.auth.signUp({ email, password, options: { data: { username } } });
+      const { data, error } = await db.auth.signUp({ 
+        email, 
+        password, 
+        options: { data: { username } } 
+      });
+
       if (error) {
         status.style.color = '#c0392b';
         status.textContent = error.message;
+      } else if (data.session) {
+        status.textContent = '';
+        updateAuthState(data.session.user);
+        window.location.reload();
       } else {
-        status.style.color = '#27ae60';
-        status.textContent = data.session ? 'Registered and logged in successfully!' : 'Check your email to confirm your account.';
-        if (data.session) window.location.reload();
+        status.style.color = '#c0392b';
+        status.textContent = 'Account created, but automatic sign-in failed. Please log in manually above.';
       }
     }
 
@@ -1126,7 +1132,7 @@
       status.textContent = 'Sending password reset link...';
 
       const { error } = await db.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.href
+        redirectTo: window.location.origin
       });
 
       if (error) {
@@ -1244,9 +1250,7 @@
       const { data: profiles } = await db.from('profiles').select('*');
       const tbody = document.getElementById('memberListBody');
       const adminColHeader = document.getElementById('memberAdminCol');
-      const isAdmin = checkIsAdmin();
-      const myUsername = currentUser ? (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase() : '';
-      const isPrimaryAdmin = myUsername === 'biggie';
+      const isPrimaryAdmin = currentUser ? ((currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase() === 'biggie') : false;
 
       adminColHeader.classList.toggle('hidden', !isPrimaryAdmin);
 
