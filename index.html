@@ -118,6 +118,49 @@
     .center-col { text-align: center; width: 70px; }
     .last-post-col { width: 190px; font-size: 10px; color: #4a423d; }
 
+    /* Classic Who's Online Box */
+    .online-box {
+      margin: 12px 0 0 0;
+      border-top: 1px solid #e0b492;
+      background: #fff9f5;
+    }
+    .online-header {
+      background: linear-gradient(180deg, #f39c12 0%, #d35400 100%);
+      color: #ffffff;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .online-body {
+      padding: 8px 10px;
+      font-size: 11px;
+      color: #4a423d;
+      line-height: 1.5;
+    }
+
+    /* Online Status Dots */
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+    .status-online {
+      background-color: #27ae60;
+      box-shadow: 0 0 4px #27ae60;
+    }
+    .status-offline {
+      background-color: #b2bec3;
+    }
+    .status-label {
+      font-size: 9px;
+      font-weight: bold;
+      margin-bottom: 4px;
+      display: block;
+    }
+
     /* Classic Post Layout (2-Column User Info + Message) */
     .post-box {
       border: 1px solid #e0b492;
@@ -149,12 +192,31 @@
       font-weight: bold;
       font-size: 12px;
       color: #d35400;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
       word-break: break-word;
     }
     .author-rank {
       font-size: 10px;
       color: #7a7267;
+      margin-bottom: 6px;
+    }
+    .admin-badge {
+      display: inline-block;
+      background: #c0392b;
+      color: #ffffff;
+      font-size: 9px;
+      font-weight: bold;
+      padding: 2px 5px;
+      border-radius: 3px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    .author-stats {
+      font-size: 10px;
+      color: #555555;
+      border-top: 1px dashed #e8ccc0;
+      padding-top: 6px;
+      margin-top: 6px;
     }
     .post-content-cell {
       padding: 12px;
@@ -285,6 +347,14 @@
           <tr><td colspan="4" style="text-align:center; padding:16px;">Loading boards...</td></tr>
         </tbody>
       </table>
+
+      <!-- Who's Online Section -->
+      <div class="online-box">
+        <div class="online-header">Who's Online</div>
+        <div class="online-body" id="whosOnlineText">
+          Checking active users...
+        </div>
+      </div>
     </div>
 
     <!-- VIEW 2: THREAD LIST FOR SELECTED BOARD -->
@@ -362,6 +432,9 @@
     let currentUser = null;
     let currentBoard = null;
     let currentThread = null;
+    let presenceChannel = null;
+    let onlineUsernames = new Set();
+    const sessionKey = 'guest-' + Math.random().toString(36).substring(2, 10);
 
     async function init() {
       const { data: { session } } = await db.auth.getSession();
@@ -369,8 +442,10 @@
 
       db.auth.onAuthStateChange((_event, session) => {
         updateAuthState(session?.user || null);
+        trackUserPresence();
       });
 
+      setupPresence();
       await showIndex();
 
       db.channel('forum-realtime')
@@ -385,6 +460,81 @@
           if (!document.getElementById('viewIndex').classList.contains('hidden')) showIndex();
         })
         .subscribe();
+    }
+
+    // Real-time Online Status Tracking via Supabase Presence
+    function setupPresence() {
+      presenceChannel = db.channel('online-users', {
+        config: { presence: { key: sessionKey } }
+      });
+
+      presenceChannel
+        .on('presence', { event: 'sync' }, () => {
+          const state = presenceChannel.presenceState();
+          const members = new Set();
+          let guestCount = 0;
+
+          Object.values(state).forEach(presences => {
+            presences.forEach(p => {
+              if (p.username) {
+                members.add(p.username);
+              } else {
+                guestCount++;
+              }
+            });
+          });
+
+          onlineUsernames = new Set(Array.from(members).map(u => u.toLowerCase()));
+          updateOnlineUI(Array.from(members), guestCount);
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await trackUserPresence();
+          }
+        });
+    }
+
+    async function trackUserPresence() {
+      if (!presenceChannel) return;
+      const username = currentUser
+        ? (currentUser.user_metadata?.username || currentUser.email.split('@')[0])
+        : null;
+
+      await presenceChannel.track({
+        username: username,
+        online_at: new Date().toISOString()
+      });
+    }
+
+    function updateOnlineUI(memberList, guestCount) {
+      const box = document.getElementById('whosOnlineText');
+      if (box) {
+        const total = memberList.length + guestCount;
+        const formattedMembers = memberList.length > 0
+          ? memberList.map(name => {
+              const isBiggie = name.toLowerCase() === 'biggie';
+              return isBiggie
+                ? `<b style="color:#c0392b;">${escapeHtml(name)}</b>`
+                : `<b>${escapeHtml(name)}</b>`;
+            }).join(', ')
+          : 'None';
+
+        box.innerHTML = `
+          There are currently <b>${total}</b> users online (${memberList.length} members, ${guestCount} guests).<br/>
+          <span style="color:#6e655f;">Active Members:</span> ${formattedMembers}
+        `;
+      }
+
+      // Live-update status dots if currently viewing a thread
+      if (!document.getElementById('viewThread').classList.contains('hidden')) {
+        document.querySelectorAll('.user-status-indicator').forEach(el => {
+          const uname = (el.getAttribute('data-username') || '').toLowerCase();
+          const isOnline = onlineUsernames.has(uname);
+          el.innerHTML = isOnline
+            ? `<span class="status-dot status-online"></span><span style="color:#27ae60;">Online</span>`
+            : `<span class="status-dot status-offline"></span><span style="color:#7a7267;">Offline</span>`;
+        });
+      }
     }
 
     function updateAuthState(user) {
@@ -599,29 +749,56 @@
         .eq('thread_id', threadId)
         .order('created_at', { ascending: true });
 
+      const { data: allUserThreads } = await db.from('messages').select('username');
+      const { data: allUserReplies } = await db.from('replies').select('username');
+
+      const counts = {};
+      [...(allUserThreads || []), ...(allUserReplies || [])].forEach(item => {
+        const u = item.username || 'Member';
+        counts[u] = (counts[u] || 0) + 1;
+      });
+
       const allPosts = [
         { ...thread, isOP: true },
         ...(replies || []).map(r => ({ ...r, isOP: false }))
       ];
 
       const container = document.getElementById('threadPostsContainer');
-      container.innerHTML = allPosts.map((p, index) => `
-        <div class="post-box">
-          <div class="post-header">
-            <span>Posted: ${formatDate(p.created_at)}</span>
-            <span><b>#${index + 1}</b> ${p.isOP ? '(Thread Starter)' : ''}</span>
+      container.innerHTML = allPosts.map((p, index) => {
+        const uname = p.username || 'Member';
+        const postCount = counts[uname] || 1;
+        
+        // Admin check set to 'biggie'
+        const isAdmin = uname.toLowerCase() === 'biggie';
+        const isOnline = onlineUsernames.has(uname.toLowerCase());
+
+        return `
+          <div class="post-box">
+            <div class="post-header">
+              <span>Posted: ${formatDate(p.created_at)}</span>
+              <span><b>#${index + 1}</b> ${p.isOP ? '(Thread Starter)' : ''}</span>
+            </div>
+            <table class="post-body-table">
+              <tr>
+                <td class="post-author-cell">
+                  <div class="author-name">${escapeHtml(uname)}</div>
+                  <span class="status-label user-status-indicator" data-username="${escapeHtml(uname)}">
+                    ${isOnline
+                      ? `<span class="status-dot status-online"></span><span style="color:#27ae60;">Online</span>`
+                      : `<span class="status-dot status-offline"></span><span style="color:#7a7267;">Offline</span>`
+                    }
+                  </span>
+                  ${isAdmin ? '<div class="admin-badge">Site Admin</div>' : '<div class="author-rank">Forum Member</div>'}
+                  <div class="author-stats">
+                    Posts: <b>${postCount}</b>
+                  </div>
+                </td>
+                <td class="post-content-cell">${formatPostBody(p.message)}</td>
+              </tr>
+            </table>
           </div>
-          <table class="post-body-table">
-            <tr>
-              <td class="post-author-cell">
-                <div class="author-name">${escapeHtml(p.username || 'Member')}</div>
-                <div class="author-rank">Forum Member</div>
-              </td>
-              <td class="post-content-cell">${formatPostBody(p.message)}</td>
-            </tr>
-          </table>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     async function postReply() {
