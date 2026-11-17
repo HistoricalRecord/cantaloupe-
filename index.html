@@ -870,6 +870,7 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
           if (!document.getElementById('viewIndex').classList.contains('hidden')) showIndex();
           if (!document.getElementById('viewBoard').classList.contains('hidden') && currentBoard) openBoard(currentBoard, false);
+          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage, false);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'replies' }, (payload) => {
           if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread && payload.new?.thread_id === currentThread.id) {
@@ -1003,7 +1004,6 @@
 
       const uploadedUrls = [];
       for (const file of files) {
-        // 60MB limit to comfortably support 60-second video clips
         if (file.size > 60 * 1024 * 1024) {
           throw new Error(`File ${file.name} is larger than 60MB.`);
         }
@@ -1019,6 +1019,40 @@
         }
       }
       return uploadedUrls;
+    }
+
+    // EDIT POST FEATURE LOGIC
+    function startEditingPost(id, targetType, currentMessage) {
+      const cellId = `post-content-${targetType}-${id}`;
+      const cell = document.getElementById(cellId);
+      if (!cell) return;
+
+      cell.innerHTML = `
+        <textarea id="editText-${targetType}-${id}" rows="4" style="width:100%; margin-bottom:6px;">${escapeHtml(currentMessage)}</textarea>
+        <div style="display:flex; gap:6px;">
+          <button class="primary-btn" onclick="saveEditedPost(${id}, '${targetType}')">Save Edit</button>
+          <button onclick="openThread(${currentThread.id}, ${currentThreadPage}, false)">Cancel</button>
+        </div>
+      `;
+    }
+
+    async function saveEditedPost(id, targetType) {
+      const textarea = document.getElementById(`editText-${targetType}-${id}`);
+      if (!textarea) return;
+      const newContent = textarea.value.trim();
+      if (!newContent) {
+        alert('Post cannot be empty.');
+        return;
+      }
+
+      const table = targetType === 'message' ? 'messages' : 'replies';
+      const { error } = await db.from(table).update({ message: newContent }).eq('id', id);
+
+      if (error) {
+        alert('Error updating post: ' + error.message);
+      } else {
+        openThread(currentThread.id, currentThreadPage, false);
+      }
     }
 
     function toggleProfileEditor(pushHistory = true) {
@@ -1998,6 +2032,10 @@
           ? ` <button style="font-size:9px; padding:1px 4px;" onclick="openDirectMessage('${escapeHtml(uname)}')">PM</button>`
           : '';
 
+        const editBtn = (isAdmin || myUsername === lName)
+          ? ` <button style="font-size:9px; padding:1px 4px; background:#f39c12; color:#fff;" onclick="startEditingPost(${p.id}, '${p.targetType}', ${JSON.stringify(p.message)})">Edit</button>`
+          : '';
+
         const lockBtn = (isAdmin && p.isOP)
           ? ` <button style="font-size:9px; padding:1px 4px; background:#f5b041; color:#fff;" onclick="toggleThreadLock(${p.id}, ${!thread.is_locked})">${thread.is_locked ? 'Unlock Thread' : 'Lock Thread'}</button>`
           : '';
@@ -2031,6 +2069,7 @@
                 <button style="font-size:9px; padding:1px 4px;" onclick="reportPost(${p.id}, '${p.targetType}')">Report</button>
                 ${pmBtn}
                 ${ignoreBtn}
+                ${editBtn}
                 ${lockBtn}
                 ${deleteBtn}
                 <span><b>#${p.globalIndex}</b> ${p.isOP ? '(Thread Starter)' : ''}</span>
@@ -2053,7 +2092,7 @@
                     Posts: <b>${postCount}</b>
                   </div>
                 </td>
-                <td class="post-content-cell">
+                <td class="post-content-cell" id="post-content-${p.targetType}-${p.id}">
                   ${formatPostBody(p.message)}
                   ${signature ? `<div class="post-signature">${formatPostBody(signature)}</div>` : ''}
                 </td>
