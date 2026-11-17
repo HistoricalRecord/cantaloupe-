@@ -117,7 +117,6 @@
     }
     .center-col { text-align: center; width: 70px; }
     .last-post-col { width: 190px; font-size: 10px; color: #4a423d; }
-    .vote-col { width: 65px; text-align: center; }
 
     /* Voting Widget */
     .vote-box {
@@ -444,7 +443,6 @@
       <table class="forum-table">
         <thead>
           <tr>
-            <th class="vote-col">Score</th>
             <th>Thread Title</th>
             <th style="width:130px;">Author</th>
             <th class="center-col">Replies</th>
@@ -504,7 +502,7 @@
     let currentThread = null;
     let presenceChannel = null;
     let onlineUsernames = new Set();
-    let userProfiles = {}; // Stores { avatar_url, bio }
+    let userProfiles = {};
     const sessionKey = 'guest-' + Math.random().toString(36).substring(2, 10);
 
     async function init() {
@@ -531,7 +529,6 @@
           }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => {
-          if (!document.getElementById('viewBoard').classList.contains('hidden') && currentBoard) openBoard(currentBoard);
           if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async () => {
@@ -636,6 +633,7 @@
         return;
       }
 
+      // Check if user already voted on this specific post/reply
       const { data: existing } = await db
         .from('votes')
         .select('*')
@@ -646,17 +644,20 @@
 
       if (existing) {
         if (existing.vote_type === voteType) {
+          // Clicking same vote removes it (toggle off)
           await db.from('votes').delete().eq('id', existing.id);
         } else {
+          // Switch vote type (-1 to 1 or 1 to -1)
           await db.from('votes').update({ vote_type: voteType }).eq('id', existing.id);
         }
       } else {
-        await db.from('votes').insert({
+        // Insert new vote using upsert semantics via unique constraint
+        await db.from('votes').upsert({
           user_id: currentUser.id,
           target_id: targetId,
           target_type: targetType,
           vote_type: voteType
-        });
+        }, { onConflict: 'user_id,target_id,target_type' });
       }
     }
 
@@ -821,40 +822,24 @@
         .order('created_at', { ascending: false });
 
       const { data: replies } = await db.from('replies').select('id, thread_id');
-      const { data: votes } = await db.from('votes').select('*').eq('target_type', 'message');
       const allReplies = replies || [];
-      const allVotes = votes || [];
 
       const tbody = document.getElementById('threadListBody');
       if (error) {
-        tbody.innerHTML = `<tr><td colspan="5" style="color:red;">Error: ${escapeHtml(error.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" style="color:red;">Error: ${escapeHtml(error.message)}</td></tr>`;
         return;
       }
 
       if (!threads || threads.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:18px; color:#555;">No threads have been posted in this board yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:18px; color:#555;">No threads have been posted in this board yet.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = threads.map((t, idx) => {
         const replyCount = allReplies.filter(r => r.thread_id === t.id).length;
-        const threadVotes = allVotes.filter(v => v.target_id === t.id);
-        const score = threadVotes.reduce((acc, v) => acc + v.vote_type, 0);
-
-        const userVote = currentUser ? threadVotes.find(v => v.user_id === currentUser.id)?.vote_type : 0;
-        const upStyle = userVote === 1 ? 'color:#27ae60;' : '';
-        const downStyle = userVote === -1 ? 'color:#c0392b;' : '';
-
         const rowClass = idx % 2 === 0 ? 'row-odd' : 'row-even';
         return `
           <tr class="${rowClass}">
-            <td class="vote-col">
-              <div class="vote-box">
-                <button class="vote-btn" style="${upStyle}" onclick="castVote(${t.id}, 'message', 1)">▲</button>
-                <span class="vote-score">${score}</span>
-                <button class="vote-btn" style="${downStyle}" onclick="castVote(${t.id}, 'message', -1)">▼</button>
-              </div>
-            </td>
             <td><a href="javascript:void(0)" onclick="openThread(${t.id})">${escapeHtml(t.title || 'Untitled Thread')}</a></td>
             <td>${escapeHtml(t.username || 'Member')}</td>
             <td class="center-col">${replyCount}</td>
