@@ -163,6 +163,14 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
+    .post-content-cell a {
+      color: #1b4d89;
+      text-decoration: underline;
+      font-weight: normal;
+    }
+    .post-content-cell a:hover {
+      color: #d35400;
+    }
 
     /* Controls & Forms */
     input, textarea {
@@ -609,7 +617,7 @@
                 <div class="author-name">${escapeHtml(p.username || 'Member')}</div>
                 <div class="author-rank">Forum Member</div>
               </td>
-              <td class="post-content-cell">${escapeHtml(p.message)}</td>
+              <td class="post-content-cell">${formatPostBody(p.message)}</td>
             </tr>
           </table>
         </div>
@@ -653,6 +661,15 @@
       return String(str).replace(/[&<>"']/g, tag => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
       }[tag]));
+    }
+
+    function formatPostBody(str) {
+      const safe = escapeHtml(str);
+      return safe.replace(/(https?:\/\/[^\s<]+)/g, url => {
+        const cleanUrl = url.replace(/[.,!?;:)\]]+$/, '');
+        const trailing = url.slice(cleanUrl.length);
+        return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>${trailing}`;
+      });
     }
 
     init();
