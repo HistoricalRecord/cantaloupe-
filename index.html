@@ -188,6 +188,16 @@
       vertical-align: top;
       font-size: 11px;
     }
+    .author-avatar {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border: 1px solid #d3a081;
+      background: #ffffff;
+      padding: 2px;
+      margin: 6px 0;
+      display: block;
+    }
     .author-name {
       font-weight: bold;
       font-size: 12px;
@@ -233,6 +243,15 @@
     .post-content-cell a:hover {
       color: #d35400;
     }
+    .post-embedded-img {
+      display: block;
+      max-width: 100%;
+      max-height: 450px;
+      margin-top: 8px;
+      border: 1px solid #e0b492;
+      padding: 3px;
+      background: #fff9f5;
+    }
 
     /* Controls & Forms */
     input, textarea {
@@ -273,9 +292,18 @@
       font-size: 11px;
     }
     .form-box-body { padding: 10px; }
-    .form-box-body input, .form-box-body textarea {
+    .form-box-body input[type="text"], .form-box-body textarea {
       width: 100%;
       margin-bottom: 8px;
+    }
+    .file-upload-row {
+      margin-bottom: 8px;
+      font-size: 11px;
+      color: #5a4a3f;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
     }
 
     .hidden { display: none !important; }
@@ -291,6 +319,7 @@
 
     @media (max-width: 600px) {
       .post-author-cell { width: 105px; padding: 8px; }
+      .author-avatar { width: 64px; height: 64px; }
       .last-post-col { display: none; }
     }
   </style>
@@ -321,7 +350,9 @@
         <button onclick="signIn()">Log In</button>
         <button onclick="signUp()">Register</button>
       </div>
-      <div id="loggedInControls" class="hidden">
+      <div id="loggedInControls" class="hidden" style="display:flex; gap:6px; align-items:center;">
+        <input type="file" id="avatarFileInput" accept="image/*" class="hidden" onchange="uploadAvatar(event)" />
+        <button onclick="document.getElementById('avatarFileInput').click()">Change Avatar</button>
         <button onclick="signOut()">Log Out</button>
       </div>
     </div>
@@ -370,7 +401,11 @@
         <div class="form-box-body">
           <input type="text" id="threadTitleInput" placeholder="Thread Subject / Title" maxlength="120" />
           <textarea id="threadBodyInput" rows="5" placeholder="Enter your message here..."></textarea>
-          <button class="primary-btn" onclick="createThread()">Submit New Thread</button>
+          <div class="file-upload-row">
+            <label for="threadImageInput"><b>Attach Image (Optional):</b></label>
+            <input type="file" id="threadImageInput" accept="image/*" />
+          </div>
+          <button class="primary-btn" id="submitThreadBtn" onclick="createThread()">Submit New Thread</button>
           <button onclick="toggleNewThreadForm()">Cancel</button>
           <div id="threadStatus" class="status-msg"></div>
         </div>
@@ -403,7 +438,11 @@
         <div class="form-box-header">Post a Reply</div>
         <div class="form-box-body">
           <textarea id="replyBodyInput" rows="4" placeholder="Write your reply to this thread..."></textarea>
-          <button class="primary-btn" onclick="postReply()">Post Reply</button>
+          <div class="file-upload-row">
+            <label for="replyImageInput"><b>Attach Image (Optional):</b></label>
+            <input type="file" id="replyImageInput" accept="image/*" />
+          </div>
+          <button class="primary-btn" id="submitReplyBtn" onclick="postReply()">Post Reply</button>
           <div id="replyStatus" class="status-msg"></div>
         </div>
       </div>
@@ -417,6 +456,7 @@
   <script>
     const SUPABASE_URL = 'https://aeazovwgddsjzhvvifab.supabase.co';
     const SUPABASE_KEY = 'sb_publishable__2S12w5d3RXrN6EeKZbQxQ_Y87phSlJ';
+    const BUCKET_NAME = 'forum-images';
     const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     // Strictly Alphabetical Boards
@@ -434,6 +474,7 @@
     let currentThread = null;
     let presenceChannel = null;
     let onlineUsernames = new Set();
+    let userAvatars = {};
     const sessionKey = 'guest-' + Math.random().toString(36).substring(2, 10);
 
     async function init() {
@@ -445,6 +486,7 @@
         trackUserPresence();
       });
 
+      await loadAvatars();
       setupPresence();
       await showIndex();
 
@@ -460,6 +502,74 @@
           if (!document.getElementById('viewIndex').classList.contains('hidden')) showIndex();
         })
         .subscribe();
+    }
+
+    // Load all user profile pictures
+    async function loadAvatars() {
+      const { data } = await db.from('profiles').select('username, avatar_url');
+      if (data) {
+        userAvatars = {};
+        data.forEach(p => {
+          if (p.username && p.avatar_url) {
+            userAvatars[p.username.toLowerCase()] = p.avatar_url;
+          }
+        });
+      }
+    }
+
+    // Upload an image file to Supabase Storage and return its public URL
+    async function uploadImageToStorage(file, folder) {
+      if (!file) return null;
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error('Image must be smaller than 5MB.');
+      }
+      const ext = file.name.split('.').pop() || 'png';
+      const fileName = `${folder}/${currentUser.id}-${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await db.storage
+        .from(BUCKET_NAME)
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = db.storage.from(BUCKET_NAME).getPublicUrl(fileName);
+      return data.publicUrl;
+    }
+
+    // Handle Profile Picture Change
+    async function uploadAvatar(event) {
+      const file = event.target.files[0];
+      if (!file || !currentUser) return;
+
+      const status = document.getElementById('authStatus');
+      status.style.color = '#d35400';
+      status.textContent = 'Uploading new avatar...';
+
+      try {
+        const publicUrl = await uploadImageToStorage(file, 'avatars');
+        const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+
+        const { error } = await db.from('profiles').upsert({
+          username: username,
+          avatar_url: publicUrl
+        });
+
+        if (error) throw error;
+
+        userAvatars[username.toLowerCase()] = publicUrl;
+        status.style.color = '#27ae60';
+        status.textContent = 'Avatar updated!';
+        setTimeout(() => { status.textContent = ''; }, 3000);
+
+        if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) {
+          openThread(currentThread.id);
+        }
+      } catch (err) {
+        status.style.color = '#c0392b';
+        status.textContent = 'Avatar upload failed: ' + err.message;
+      } finally {
+        event.target.value = '';
+      }
     }
 
     // Real-time Online Status Tracking via Supabase Presence
@@ -525,7 +635,6 @@
         `;
       }
 
-      // Live-update status dots if currently viewing a thread
       if (!document.getElementById('viewThread').classList.contains('hidden')) {
         document.querySelectorAll('.user-status-indicator').forEach(el => {
           const uname = (el.getAttribute('data-username') || '').toLowerCase();
@@ -695,40 +804,60 @@
       if (!currentUser || !currentBoard) return;
       const titleInput = document.getElementById('threadTitleInput');
       const bodyInput = document.getElementById('threadBodyInput');
+      const imageInput = document.getElementById('threadImageInput');
       const status = document.getElementById('threadStatus');
+      const btn = document.getElementById('submitThreadBtn');
 
       const title = titleInput.value.trim();
-      const body = bodyInput.value.trim();
-      if (!title || !body) {
-        status.textContent = 'Please enter both a thread title and message.';
+      let body = bodyInput.value.trim();
+      const imageFile = imageInput.files[0];
+
+      if (!title || (!body && !imageFile)) {
+        status.textContent = 'Please enter a thread title and a message or image.';
         return;
       }
 
-      const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
-      status.textContent = 'Posting thread...';
+      btn.disabled = true;
+      status.style.color = '#d35400';
 
-      const { data, error } = await db.from('messages').insert({
-        user_id: currentUser.id,
-        username: username,
-        category: currentBoard,
-        title: title,
-        message: body
-      }).select().single();
+      try {
+        if (imageFile) {
+          status.textContent = 'Uploading image...';
+          const imageUrl = await uploadImageToStorage(imageFile, 'posts');
+          body = body ? `${body}\n\n${imageUrl}` : imageUrl;
+        }
 
-      if (error) {
-        status.textContent = error.message;
-      } else {
+        const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+        status.textContent = 'Posting thread...';
+
+        const { data, error } = await db.from('messages').insert({
+          user_id: currentUser.id,
+          username: username,
+          category: currentBoard,
+          title: title,
+          message: body
+        }).select().single();
+
+        if (error) throw error;
+
         titleInput.value = '';
         bodyInput.value = '';
+        imageInput.value = '';
         status.textContent = '';
         document.getElementById('newThreadForm').classList.add('hidden');
         openThread(data.id);
+      } catch (err) {
+        status.style.color = '#c0392b';
+        status.textContent = err.message;
+      } finally {
+        btn.disabled = false;
       }
     }
 
     // VIEW 3: SINGLE THREAD & REPLIES
     async function openThread(threadId) {
       switchView('viewThread');
+      await loadAvatars();
 
       const { data: thread, error } = await db.from('messages').select('*').eq('id', threadId).single();
       if (error || !thread) return;
@@ -767,10 +896,9 @@
       container.innerHTML = allPosts.map((p, index) => {
         const uname = p.username || 'Member';
         const postCount = counts[uname] || 1;
-        
-        // Admin check set to 'biggie'
         const isAdmin = uname.toLowerCase() === 'biggie';
         const isOnline = onlineUsernames.has(uname.toLowerCase());
+        const avatarUrl = userAvatars[uname.toLowerCase()];
 
         return `
           <div class="post-box">
@@ -789,6 +917,7 @@
                     }
                   </span>
                   ${isAdmin ? '<div class="admin-badge">Site Admin</div>' : '<div class="author-rank">Forum Member</div>'}
+                  ${avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(uname)}'s avatar" class="author-avatar" />` : ''}
                   <div class="author-stats">
                     Posts: <b>${postCount}</b>
                   </div>
@@ -804,26 +933,45 @@
     async function postReply() {
       if (!currentUser || !currentThread) return;
       const input = document.getElementById('replyBodyInput');
+      const imageInput = document.getElementById('replyImageInput');
       const status = document.getElementById('replyStatus');
-      const text = input.value.trim();
-      if (!text) return;
+      const btn = document.getElementById('submitReplyBtn');
 
-      const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
-      status.textContent = 'Posting reply...';
+      let text = input.value.trim();
+      const imageFile = imageInput.files[0];
+      if (!text && !imageFile) return;
 
-      const { error } = await db.from('replies').insert({
-        thread_id: currentThread.id,
-        user_id: currentUser.id,
-        username: username,
-        message: text
-      });
+      btn.disabled = true;
+      status.style.color = '#d35400';
 
-      if (error) {
-        status.textContent = error.message;
-      } else {
+      try {
+        if (imageFile) {
+          status.textContent = 'Uploading image...';
+          const imageUrl = await uploadImageToStorage(imageFile, 'posts');
+          text = text ? `${text}\n\n${imageUrl}` : imageUrl;
+        }
+
+        const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+        status.textContent = 'Posting reply...';
+
+        const { error } = await db.from('replies').insert({
+          thread_id: currentThread.id,
+          user_id: currentUser.id,
+          username: username,
+          message: text
+        });
+
+        if (error) throw error;
+
         input.value = '';
+        imageInput.value = '';
         status.textContent = '';
         await openThread(currentThread.id);
+      } catch (err) {
+        status.style.color = '#c0392b';
+        status.textContent = err.message;
+      } finally {
+        btn.disabled = false;
       }
     }
 
@@ -845,6 +993,10 @@
       return safe.replace(/(https?:\/\/[^\s<]+)/g, url => {
         const cleanUrl = url.replace(/[.,!?;:)\]]+$/, '');
         const trailing = url.slice(cleanUrl.length);
+        // Automatically embed direct image URLs (including uploaded Supabase images)
+        if (/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(cleanUrl)) {
+          return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer"><img src="${cleanUrl}" class="post-embedded-img" alt="User posted image" /></a>${trailing}`;
+        }
         return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>${trailing}`;
       });
     }
