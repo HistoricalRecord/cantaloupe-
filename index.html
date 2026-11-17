@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cantaloupe Chat</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #fff9f2;
+      --card: #ffffff;
+      --primary: #ff8c42;
+      --primary-dark: #e06d24;
+      --accent: #4caf50;
+      --text: #2d2a26;
+      --muted: #7a7267;
+      --border: #eedcc8;
+    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      padding: 16px;
+    }
+    .container {
+      width: 100%;
+      max-width: 600px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+    h1 { margin: 0; font-size: 1.4rem; color: var(--primary-dark); }
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    button:hover { background: var(--primary-dark); }
+    button.secondary { background: #eee6dc; color: var(--text); }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      margin-bottom: 10px;
+    }
+    .auth-box {
+      background: #fff4e8;
+      padding: 14px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+    }
+    .messages {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 55vh;
+      overflow-y: auto;
+      margin-bottom: 16px;
+      padding-right: 4px;
+    }
+    .msg {
+      background: #faf6f0;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 14px;
+    }
+    .msg-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .msg-user { font-weight: 700; color: var(--primary-dark); }
+    .msg-body { white-space: pre-wrap; word-break: break-word; }
+    .hidden { display: none; }
+    .status { font-size: 0.85rem; color: #c0392b; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🍈 Cantaloupe Chat</h1>
+      <button id="logoutBtn" class="secondary hidden" onclick="signOut()">Log out</button>
+    </header>
+
+    <!-- Auth Section -->
+    <div id="authSection" class="auth-box">
+      <div style="font-weight: 600; margin-bottom: 8px;">Sign in or create an account to post</div>
+      <input type="text" id="usernameInput" placeholder="Username (for new accounts)" />
+      <input type="email" id="emailInput" placeholder="Email address" />
+      <input type="password" id="passwordInput" placeholder="Password (min 6 characters)" />
+      <div style="display: flex; gap: 8px;">
+        <button onclick="signIn()" style="flex:1;">Log In</button>
+        <button onclick="signUp()" class="secondary" style="flex:1;">Sign Up</button>
+      </div>
+      <div id="authStatus" class="status"></div>
+    </div>
+
+    <!-- Message Feed -->
+    <div id="messagesList" class="messages">
+      <div style="color: var(--muted); text-align: center;">Loading messages...</div>
+    </div>
+
+    <!-- Post Form (Logged-in users only) -->
+    <div id="postSection" class="hidden">
+      <textarea id="messageInput" rows="2" placeholder="Write a message to the board..."></textarea>
+      <button onclick="postMessage()" style="width: 100%;">Post Message</button>
+      <div id="postStatus" class="status"></div>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://aeazovwgddsjzhvvifab.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable__2S12w5d3RXrN6EeKZbQxQ_Y87phSlJ';
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let currentUser = null;
+
+    async function init() {
+      const { data: { session } } = await db.auth.getSession();
+      updateAuthState(session?.user || null);
+
+      db.auth.onAuthStateChange((_event, session) => {
+        updateAuthState(session?.user || null);
+      });
+
+      await loadMessages();
+
+      // Listen for new messages in real time
+      db.channel('public:messages')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+          loadMessages();
+        })
+        .subscribe();
+    }
+
+    function updateAuthState(user) {
+      currentUser = user;
+      document.getElementById('authSection').classList.toggle('hidden', !!user);
+      document.getElementById('postSection').classList.toggle('hidden', !user);
+      document.getElementById('logoutBtn').classList.toggle('hidden', !user);
+    }
+
+    async function signUp() {
+      const email = document.getElementById('emailInput').value.trim();
+      const password = document.getElementById('passwordInput').value;
+      const username = document.getElementById('usernameInput').value.trim() || email.split('@')[0];
+      const status = document.getElementById('authStatus');
+      status.textContent = 'Creating account...';
+
+      const { data, error } = await db.auth.signUp({
+        email,
+        password,
+        options: { data: { username } }
+      });
+
+      if (error) {
+        status.textContent = error.message;
+      } else {
+        status.style.color = '#2e7d32';
+        status.textContent = data.session ? 'Signed in!' : 'Check your email to confirm your account (or disable email confirmation in Supabase Auth settings).';
+      }
+    }
+
+    async function signIn() {
+      const email = document.getElementById('emailInput').value.trim();
+      const password = document.getElementById('passwordInput').value;
+      const status = document.getElementById('authStatus');
+      status.style.color = '#c0392b';
+      status.textContent = 'Logging in...';
+
+      const { error } = await db.auth.signInWithPassword({ email, password });
+      if (error) {
+        status.textContent = error.message;
+      } else {
+        status.textContent = '';
+      }
+    }
+
+    async function signOut() {
+      await db.auth.signOut();
+    }
+
+    async function loadMessages() {
+      const list = document.getElementById('messagesList');
+      const { data, error } = await db
+        .from('messages')
+        .select('*')
+        .order('created_at', { ascending: true })
+        .limit(100);
+
+      if (error) {
+        list.innerHTML = `<div style="color:#c0392b;">Error loading messages: ${error.message}</div>`;
+        return;
+      }
+
+      if (!data.length) {
+        list.innerHTML = `<div style="color:var(--muted); text-align:center;">No messages yet. Be the first to say hello!</div>`;
+        return;
+      }
+
+      list.innerHTML = data.map(m => {
+        const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return `
+          <div class="msg">
+            <div class="msg-header">
+              <span class="msg-user">${escapeHtml(m.username || 'Anonymous')}</span>
+              <span>${time}</span>
+            </div>
+            <div class="msg-body">${escapeHtml(m.message)}</div>
+          </div>
+        `;
+      }).join('');
+      list.scrollTop = list.scrollHeight;
+    }
+
+    async function postMessage() {
+      if (!currentUser) return;
+      const input = document.getElementById('messageInput');
+      const status = document.getElementById('postStatus');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      status.textContent = '';
+
+      const { error } = await db.from('messages').insert({
+        user_id: currentUser.id,
+        username: username,
+        message: text
+      });
+
+      if (error) {
+        status.textContent = error.message;
+      } else {
+        input.value = '';
+        await loadMessages();
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, tag => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[tag]));
+    }
+
+    init();
+  </script>
+</body>
+</html>
