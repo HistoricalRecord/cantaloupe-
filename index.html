@@ -203,6 +203,8 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
     }
     .post-body-table {
       width: 100%;
@@ -296,7 +298,7 @@
       text-align: center;
     }
 
-    /* Standalone Authentication Portal Screen */
+    /* Standalone Auth Portal */
     .auth-portal-container {
       display: flex;
       flex-direction: column;
@@ -546,7 +548,7 @@
       </div>
 
       <div id="composePMBox" class="form-box hidden">
-        <div class="form-box-header">New Private Message</div>
+        <div class="form-box-header">New Direct Message</div>
         <div class="form-box-body">
           <input type="text" id="pmRecipientInput" placeholder="Recipient Username" />
           <input type="text" id="pmSubjectInput" placeholder="Subject" maxlength="100" />
@@ -591,6 +593,7 @@
             <th>Rank / Title</th>
             <th class="center-col">Total Posts</th>
             <th>Status / Bio</th>
+            <th id="memberAdminCol" class="hidden" style="width:100px; text-align:center;">Admin Power</th>
           </tr>
         </thead>
         <tbody id="memberListBody"></tbody>
@@ -622,7 +625,7 @@
           <textarea id="editSignatureInput" rows="2" placeholder="e.g. -- Official Cantaloupe Chat Moderator" maxlength="200"></textarea>
         </div>
         <button class="primary-btn" id="saveProfileBtn" onclick="saveProfileChanges()">Save Profile</button>
-        <button onclick="showIndex()">Cancel</button>
+        <button onclick="navigateHome()">Cancel</button>
         <div id="profileEditStatus" class="status-msg"></div>
       </div>
     </div>
@@ -660,7 +663,7 @@
         </tbody>
       </table>
 
-      <!-- Admin Reports Section (Only visible to admin 'biggie') -->
+      <!-- Admin Reports Section (Only visible to admins) -->
       <div id="adminReportsBox" class="stats-box hidden" style="border-top:2px solid #c0392b;">
         <div class="stats-header" style="background:linear-gradient(180deg, #e74c3c 0%, #c0392b 100%);">Admin Moderation Queue (Reported Posts)</div>
         <div class="stats-body" id="adminReportsBody">Loading reports...</div>
@@ -721,6 +724,10 @@
       <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1; display:flex; justify-content:space-between; align-items:center;">
         <strong id="singleThreadTitle" style="font-size:13px; color:#d35400;">Thread Title</strong>
         <button onclick="openBoard(currentBoard)">&laquo; Back to Board</button>
+      </div>
+
+      <div id="threadLockedNotice" class="hidden" style="background:#fadbd8; color:#78281f; padding:8px 12px; font-size:11px; font-weight:bold; border-bottom:1px solid #f5b7b1; text-align:center;">
+        🔒 This thread has been locked by an administrator. New replies are disabled.
       </div>
 
       <div id="threadPostsContainer"></div>
@@ -831,7 +838,7 @@
     }
 
     async function loadProfiles() {
-      const { data } = await db.from('profiles').select('username, avatar_url, bio, signature, custom_title');
+      const { data } = await db.from('profiles').select('username, avatar_url, bio, signature, custom_title, is_admin');
       if (data) {
         userProfiles = {};
         data.forEach(p => {
@@ -840,11 +847,19 @@
               avatar_url: p.avatar_url || '',
               bio: p.bio || '',
               signature: p.signature || '',
-              custom_title: p.custom_title || ''
+              custom_title: p.custom_title || '',
+              is_admin: !!p.is_admin || p.username.toLowerCase() === 'biggie'
             };
           }
         });
       }
+    }
+
+    function checkIsAdmin() {
+      if (!currentUser) return false;
+      const uname = (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase();
+      if (uname === 'biggie') return true;
+      return userProfiles[uname]?.is_admin === true;
     }
 
     async function loadIgnoredUsers() {
@@ -961,7 +976,7 @@
 
         if (error) throw error;
 
-        userProfiles[lKey] = { avatar_url: avatarUrl, bio: bio, signature: signature, custom_title: customTitle };
+        await loadProfiles();
         status.style.color = '#27ae60';
         status.textContent = 'Profile updated successfully!';
         fileInput.value = '';
@@ -1071,7 +1086,7 @@
       }
     }
 
-    // Post Reporting
+    // Post Reporting & Moderation
     async function reportPost(targetId, targetType) {
       if (!currentUser) {
         alert('Please log in to report posts.');
@@ -1100,6 +1115,69 @@
       showIndex();
     }
 
+    async function deletePostItem(id, type) {
+      if (!checkIsAdmin()) {
+        alert('Only administrators can delete posts.');
+        return;
+      }
+      const confirmMsg = type === 'message' 
+        ? 'Are you sure you want to delete this entire thread?' 
+        : 'Are you sure you want to delete this reply?';
+        
+      if (!confirm(confirmMsg)) return;
+
+      const table = type === 'message' ? 'messages' : 'replies';
+      const { error } = await db.from(table).delete().eq('id', id);
+
+      if (error) {
+        alert('Error deleting item: ' + error.message);
+      } else {
+        alert('Item deleted successfully.');
+        if (type === 'message') {
+          showIndex();
+        } else {
+          openThread(currentThread.id, currentThreadPage);
+        }
+      }
+    }
+
+    async function toggleThreadLock(threadId, makeLocked) {
+      if (!checkIsAdmin()) {
+        alert('Only administrators can lock or unlock threads.');
+        return;
+      }
+      const { error } = await db.from('messages').update({ is_locked: makeLocked }).eq('id', threadId);
+      if (error) {
+        alert('Error updating lock status: ' + error.message);
+      } else {
+        openThread(threadId, currentThreadPage);
+      }
+    }
+
+    async function toggleAdminPrivilege(username, makeAdmin) {
+      const myUsername = currentUser ? (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase() : '';
+      if (myUsername !== 'biggie') {
+        alert('Only the primary administrator ("biggie") can promote or demote other admins.');
+        return;
+      }
+      if (username.toLowerCase() === 'biggie') {
+        alert('You cannot modify the primary administrator status.');
+        return;
+      }
+
+      const action = makeAdmin ? `promote ${username} to Administrator` : `revoke administrator privileges from ${username}`;
+      if (!confirm(`Are you sure you want to ${action}?`)) return;
+
+      const { error } = await db.from('profiles').update({ is_admin: makeAdmin }).eq('username', username);
+      if (error) {
+        alert('Error updating privilege: ' + error.message);
+      } else {
+        await loadProfiles();
+        alert('Admin privileges updated successfully.');
+        openMemberList();
+      }
+    }
+
     // Member Directory
     async function openMemberList() {
       ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewSearch', 'viewInbox', 'viewAuthPortal'].forEach(id => {
@@ -1113,8 +1191,15 @@
 
       const { data: profiles } = await db.from('profiles').select('*');
       const tbody = document.getElementById('memberListBody');
+      const adminColHeader = document.getElementById('memberAdminCol');
+      const isAdmin = checkIsAdmin();
+      const myUsername = currentUser ? (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase() : '';
+      const isPrimaryAdmin = myUsername === 'biggie';
+
+      adminColHeader.classList.toggle('hidden', !isPrimaryAdmin);
+
       if (!profiles || profiles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:18px;">No members registered yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${isPrimaryAdmin ? 5 : 4}" style="text-align:center; padding:18px;">No members registered yet.</td></tr>`;
         return;
       }
 
@@ -1123,20 +1208,32 @@
         const postCount = globalPostCounts[uname.toLowerCase()] || 0;
         const rankData = getUserRankAndTitle(postCount, p.custom_title);
         const rowClass = idx % 2 === 0 ? 'row-odd' : 'row-even';
-        const isAdmin = uname.toLowerCase() === 'biggie';
+        const userIsAdmin = !!p.is_admin || uname.toLowerCase() === 'biggie';
+
+        let adminActionBtn = '';
+        if (isPrimaryAdmin && uname.toLowerCase() !== 'biggie') {
+          if (userIsAdmin) {
+            adminActionBtn = `<td style="text-align:center;"><button style="font-size:9px; background:#fadbd8; color:#78281f;" onclick="toggleAdminPrivilege('${escapeHtml(uname)}', false)">Demote</button></td>`;
+          } else {
+            adminActionBtn = `<td style="text-align:center;"><button style="font-size:9px; background:#d4efdf; color:#145a32;" onclick="toggleAdminPrivilege('${escapeHtml(uname)}', true)">Make Admin</button></td>`;
+          }
+        } else if (isPrimaryAdmin) {
+          adminActionBtn = `<td style="text-align:center; font-size:9px; color:#7a7267;">Primary</td>`;
+        }
 
         return `
           <tr class="${rowClass}">
-            <td><b>${escapeHtml(uname)}</b> ${isAdmin ? '<span class="admin-badge">Admin</span>' : ''}</td>
+            <td><b>${escapeHtml(uname)}</b> ${userIsAdmin ? '<span class="admin-badge">Admin</span>' : ''}</td>
             <td>${escapeHtml(rankData.rankTitle)} ${rankData.stars}</td>
             <td class="center-col">${postCount}</td>
             <td>${escapeHtml(p.bio || 'No status message.')}</td>
+            ${isPrimaryAdmin ? adminActionBtn : ''}
           </tr>
         `;
       }).join('');
     }
 
-    // Private Messaging Functions
+    // Direct Messaging Functions
     async function updateInboxCount() {
       if (!currentUser) return;
       const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
@@ -1198,6 +1295,14 @@
 
     function toggleComposePM() {
       document.getElementById('composePMBox').classList.toggle('hidden');
+    }
+
+    function openDirectMessage(recipientUsername) {
+      openInbox();
+      toggleComposePM();
+      document.getElementById('pmRecipientInput').value = recipientUsername;
+      document.getElementById('pmSubjectInput').value = `Direct Message`;
+      document.getElementById('pmBodyInput').focus();
     }
 
     async function sendPM() {
@@ -1381,7 +1486,7 @@
       const totalOnline = memberList.length + guestCount;
 
       const formattedMembers = memberList.length > 0
-        ? memberList.map(name => name.toLowerCase() === 'biggie' ? `<b style="color:#c0392b;">${escapeHtml(name)}</b>` : `<b>${escapeHtml(name)}</b>`).join(', ')
+        ? memberList.map(name => userProfiles[name.toLowerCase()]?.is_admin ? `<b style="color:#c0392b;">${escapeHtml(name)}</b>` : `<b>${escapeHtml(name)}</b>`).join(', ')
         : 'None';
 
       box.innerHTML = `
@@ -1392,7 +1497,7 @@
       `;
 
       // Check admin reports box
-      const isAdmin = currentUser && (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase() === 'biggie';
+      const isAdmin = checkIsAdmin();
       const reportsBox = document.getElementById('adminReportsBox');
       if (isAdmin) {
         const { data: reports } = await db.from('post_reports').select('*').order('created_at', { ascending: false });
@@ -1554,17 +1659,18 @@
         return;
       }
 
-      const isAdmin = currentUser && (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase() === 'biggie';
+      const isAdmin = checkIsAdmin();
 
       tbody.innerHTML = threads.map((t, idx) => {
         const replyCount = allReplies.filter(r => r.thread_id === t.id).length;
         const rowClass = t.is_sticky ? 'sticky-row' : (idx % 2 === 0 ? 'row-odd' : 'row-even');
         const stickyPrefix = t.is_sticky ? '<b style="color:#e67e22;">[Sticky] 📌</b> ' : '';
+        const lockedPrefix = t.is_locked ? '<b style="color:#c0392b;">[Locked] 🔒</b> ' : '';
         const stickyBtn = isAdmin ? ` <button style="font-size:9px; padding:1px 4px;" onclick="toggleSticky(${t.id}, ${!t.is_sticky})">${t.is_sticky ? 'Unpin' : 'Pin'}</button>` : '';
 
         return `
           <tr class="${rowClass}">
-            <td>${stickyPrefix}<a href="javascript:void(0)" onclick="openThread(${t.id}, 1)">${escapeHtml(t.title || 'Untitled Thread')}</a>${stickyBtn}</td>
+            <td>${lockedPrefix}${stickyPrefix}<a href="javascript:void(0)" onclick="openThread(${t.id}, 1)">${escapeHtml(t.title || 'Untitled Thread')}</a>${stickyBtn}</td>
             <td>${escapeHtml(t.username || 'Member')}</td>
             <td class="center-col">${replyCount}</td>
             <td class="last-post-col">${formatDate(t.created_at)}</td>
@@ -1578,6 +1684,7 @@
     }
 
     async function toggleSticky(threadId, makeSticky) {
+      if (!checkIsAdmin()) return;
       const { error } = await db.from('messages').update({ is_sticky: makeSticky }).eq('id', threadId);
       if (!error && currentBoard) openBoard(currentBoard);
     }
@@ -1667,6 +1774,17 @@
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
+      // Handle locked notice and reply form visibility
+      const lockedNotice = document.getElementById('threadLockedNotice');
+      const replyFormBox = document.getElementById('replyFormBox');
+      if (thread.is_locked) {
+        lockedNotice.classList.remove('hidden');
+        replyFormBox.classList.add('hidden');
+      } else {
+        lockedNotice.classList.add('hidden');
+        replyFormBox.classList.remove('hidden');
+      }
+
       const { data: replies } = await db
         .from('replies')
         .select('*')
@@ -1689,6 +1807,8 @@
       const pagePosts = allLoadedPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
 
       const { data: allVotes } = await db.from('votes').select('*');
+      const isAdmin = checkIsAdmin();
+      const myUsername = currentUser ? (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase() : '';
 
       const container = document.getElementById('threadPostsContainer');
       container.innerHTML = pagePosts.map((p) => {
@@ -1696,7 +1816,7 @@
         const lName = uname.toLowerCase();
         const isIgnored = ignoredUsers.has(lName);
         const postCount = globalPostCounts[lName] || 1;
-        const isAdmin = lName === 'biggie';
+        const isUserAdmin = userProfiles[lName]?.is_admin || lName === 'biggie';
         const isOnline = onlineUsernames.has(lName);
         
         const profile = userProfiles[lName] || {};
@@ -1713,9 +1833,20 @@
         const upStyle = userVote === 1 ? 'color:#27ae60;' : '';
         const downStyle = userVote === -1 ? 'color:#c0392b;' : '';
 
-        const myName = currentUser ? (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase() : '';
-        const ignoreBtn = (currentUser && myName !== lName) 
+        const ignoreBtn = (currentUser && myUsername !== lName) 
           ? ` <button style="font-size:9px; padding:1px 4px;" onclick="toggleIgnoreUser('${escapeHtml(uname)}')">${isIgnored ? 'Unignore' : 'Ignore'}</button>` 
+          : '';
+
+        const pmBtn = (currentUser && myUsername !== lName)
+          ? ` <button style="font-size:9px; padding:1px 4px;" onclick="openDirectMessage('${escapeHtml(uname)}')">PM</button>`
+          : '';
+
+        const lockBtn = (isAdmin && p.isOP)
+          ? ` <button style="font-size:9px; padding:1px 4px; background:#f5b041; color:#fff;" onclick="toggleThreadLock(${p.id}, ${!thread.is_locked})">${thread.is_locked ? 'Unlock Thread' : 'Lock Thread'}</button>`
+          : '';
+
+        const deleteBtn = (isAdmin || myUsername === lName)
+          ? ` <button style="font-size:9px; padding:1px 4px; background:#e74c3c; color:#fff;" onclick="deletePostItem(${p.id}, '${p.targetType}')">Delete</button>`
           : '';
 
         if (isIgnored) {
@@ -1734,14 +1865,17 @@
           <div class="post-box">
             <div class="post-header">
               <span>Posted: ${formatDate(p.created_at)}</span>
-              <div style="display:flex; align-items:center; gap:8px;">
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                 <div class="vote-box">
                   <button class="vote-btn" style="${upStyle}" onclick="castVote(${p.id}, '${p.targetType}', 1)">▲</button>
                   <span class="vote-score">${score}</span>
                   <button class="vote-btn" style="${downStyle}" onclick="castVote(${p.id}, '${p.targetType}', -1)">▼</button>
                 </div>
                 <button style="font-size:9px; padding:1px 4px;" onclick="reportPost(${p.id}, '${p.targetType}')">Report</button>
+                ${pmBtn}
                 ${ignoreBtn}
+                ${lockBtn}
+                ${deleteBtn}
                 <span><b>#${p.globalIndex}</b> ${p.isOP ? '(Thread Starter)' : ''}</span>
               </div>
             </div>
@@ -1755,7 +1889,7 @@
                       : `<span class="status-dot status-offline"></span><span style="color:#7a7267;">Offline</span>`
                     }
                   </span>
-                  ${isAdmin ? '<div class="admin-badge">Site Admin</div>' : `<div class="author-rank">${rankData.rankTitle}</div><div class="author-stars">${rankData.stars}</div>`}
+                  ${isUserAdmin ? '<div class="admin-badge">Site Admin</div>' : `<div class="author-rank">${rankData.rankTitle}</div><div class="author-stars">${rankData.stars}</div>`}
                   ${avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(uname)}'s avatar" class="author-avatar" />` : ''}
                   ${bio ? `<div class="author-bio">"${escapeHtml(bio)}"</div>` : ''}
                   <div class="author-stats">
@@ -1788,7 +1922,7 @@
     }
 
     async function postReply() {
-      if (!currentUser || !currentThread) return;
+      if (!currentUser || !currentThread || currentThread.is_locked) return;
       const input = document.getElementById('replyBodyInput');
       const imageInput = document.getElementById('replyImageInput');
       const status = document.getElementById('replyStatus');
@@ -1857,7 +1991,7 @@
       safe = safe.replace(/\[i\](.*?)\[\/i\]/gis, '<i>$1</i>');
       safe = safe.replace(/\[u\](.*?)\[\/u\]/gis, '<u>$1</u>');
       safe = safe.replace(/\[url=(.*?)\](.*?)\[\/url\]/gis, '<a href="$1" target="_blank" rel="noopener noreferrer">$2</a>');
-      safe = safe.replace(/\[quote=(.*?)\](.*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote by $1:</b><br/>$2</div>');
+      safe = safe.replace(/\[quote=(.*?)D?\](.*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote by $1:</b><br/>$2</div>');
       safe = safe.replace(/\[quote\](.*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote:</b><br/>$1</div>');
 
       // Parse Links & Images
