@@ -95,6 +95,9 @@
       border-bottom: 1px solid #f3dcd1;
       padding: 7px 12px;
       font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     /* Classic Forum Tables with Cantaloupe Accents */
@@ -118,6 +121,7 @@
     tr.row-even td { background-color: #fff9f5; }
     tr.row-odd td { background-color: #ffffff; }
     tr.row-even:hover td, tr.row-odd:hover td { background-color: #fdebd0; }
+    tr.sticky-row td { background-color: #fff3e6 !important; border-bottom: 2px solid #e67e22; }
 
     .board-desc {
       font-size: 10px;
@@ -151,20 +155,20 @@
     .vote-btn:hover { color: #d35400; background: none; }
     .vote-score { min-width: 16px; text-align: center; color: #d35400; }
 
-    /* Classic Who's Online Box */
-    .online-box {
+    /* Classic Stats & Online Boxes */
+    .stats-box {
       margin: 12px 0 0 0;
       border-top: 1px solid #e0b492;
       background: #fff9f5;
     }
-    .online-header {
+    .stats-header {
       background: linear-gradient(180deg, #f39c12 0%, #d35400 100%);
       color: #ffffff;
       padding: 6px 10px;
       font-size: 11px;
       font-weight: bold;
     }
-    .online-body {
+    .stats-body {
       padding: 8px 10px;
       font-size: 11px;
       color: #4a423d;
@@ -440,16 +444,16 @@
     <!-- Breadcrumb Bar -->
     <div class="breadcrumb" id="breadcrumbNav">
       <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a>
+      <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
     </div>
 
-    <!-- PRIVATE MESSAGING (INBOX / COMPOSE) VIEW -->
+    <!-- PRIVATE MESSAGING VIEW -->
     <div id="viewInbox" class="hidden">
       <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1; display:flex; justify-content:space-between; align-items:center;">
         <strong style="font-size:13px; color:#d35400;">Private Messages</strong>
         <button class="primary-btn" onclick="toggleComposePM()">+ Send New Message</button>
       </div>
 
-      <!-- Compose PM Form -->
       <div id="composePMBox" class="form-box hidden">
         <div class="form-box-header">New Private Message</div>
         <div class="form-box-body">
@@ -481,6 +485,24 @@
           </tr>
         </thead>
         <tbody id="pmTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- MEMBER DIRECTORY VIEW -->
+    <div id="viewMemberList" class="hidden">
+      <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1;">
+        <strong style="font-size:13px; color:#d35400;">Member Directory</strong>
+      </div>
+      <table class="forum-table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Rank</th>
+            <th class="center-col">Total Posts</th>
+            <th>Status / Bio</th>
+          </tr>
+        </thead>
+        <tbody id="memberListBody"></tbody>
       </table>
     </div>
 
@@ -543,10 +565,10 @@
         </tbody>
       </table>
 
-      <!-- Who's Online Section -->
-      <div class="online-box">
-        <div class="online-header">Who's Online</div>
-        <div class="online-body" id="whosOnlineText">Checking active users...</div>
+      <!-- Who's Online & Board Stats Box -->
+      <div class="stats-box">
+        <div class="stats-header">Who's Online & Board Statistics</div>
+        <div class="stats-body" id="forumStatsBody">Checking active users and statistics...</div>
       </div>
     </div>
 
@@ -654,6 +676,7 @@
 
     let presenceChannel = null;
     let onlineUsernames = new Set();
+    let onlineGuestsCount = 0;
     let userProfiles = {};
     let allLoadedPosts = [];
     const sessionKey = 'guest-' + Math.random().toString(36).substring(2, 10);
@@ -726,12 +749,13 @@
     }
 
     function toggleProfileEditor() {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewInbox', 'viewSearch'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewInbox', 'viewSearch', 'viewMemberList'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
       document.getElementById('viewProfileEditor').classList.remove('hidden');
       document.getElementById('breadcrumbNav').innerHTML = `
         <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; <b>Edit Profile</b>
+        <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
       if (currentUser) {
@@ -820,6 +844,51 @@
       replyTa.focus();
     }
 
+    // Member Directory
+    async function openMemberList() {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewSearch', 'viewInbox'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById('viewMemberList').classList.remove('hidden');
+      document.getElementById('breadcrumbNav').innerHTML = `
+        <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; <b>Member Directory</b>
+        <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
+      `;
+
+      const { data: profiles } = await db.from('profiles').select('*');
+      const { data: threads } = await db.from('messages').select('username');
+      const { data: replies } = await db.from('replies').select('username');
+
+      const counts = {};
+      [...(threads || []), ...(replies || [])].forEach(item => {
+        const u = item.username || 'Member';
+        counts[u] = (counts[u] || 0) + 1;
+      });
+
+      const tbody = document.getElementById('memberListBody');
+      if (!profiles || profiles.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:18px;">No members registered yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = profiles.map((p, idx) => {
+        const uname = p.username || 'Member';
+        const postCount = counts[uname] || 0;
+        const rankData = getUserRankAndStars(postCount);
+        const rowClass = idx % 2 === 0 ? 'row-odd' : 'row-even';
+        const isAdmin = uname.toLowerCase() === 'biggie';
+
+        return `
+          <tr class="${rowClass}">
+            <td><b>${escapeHtml(uname)}</b> ${isAdmin ? '<span class="admin-badge">Admin</span>' : ''}</td>
+            <td>${rankData.rank} ${rankData.stars}</td>
+            <td class="center-col">${postCount}</td>
+            <td>${escapeHtml(p.bio || 'No status message.')}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
     // Private Messaging Functions
     async function updateInboxCount() {
       if (!currentUser) return;
@@ -835,7 +904,7 @@
     }
 
     async function openInbox() {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewSearch'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewSearch', 'viewMemberList'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
       document.getElementById('viewInbox').classList.remove('hidden');
@@ -845,6 +914,7 @@
 
       document.getElementById('breadcrumbNav').innerHTML = `
         <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; <b>Private Messages</b>
+        <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
       if (!currentUser) return;
@@ -950,12 +1020,13 @@
       const query = document.getElementById('searchInput').value.trim();
       if (!query) return;
 
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewMemberList'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
       document.getElementById('viewSearch').classList.remove('hidden');
       document.getElementById('breadcrumbNav').innerHTML = `
         <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; <b>Search: ${escapeHtml(query)}</b>
+        <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
       const { data: messages } = await db
@@ -1018,17 +1089,18 @@
         .on('presence', { event: 'sync' }, () => {
           const state = presenceChannel.presenceState();
           const members = new Set();
-          let guestCount = 0;
+          let guests = 0;
 
           Object.values(state).forEach(presences => {
             presences.forEach(p => {
               if (p.username) members.add(p.username);
-              else guestCount++;
+              else guests++;
             });
           });
 
           onlineUsernames = new Set(Array.from(members).map(u => u.toLowerCase()));
-          updateOnlineUI(Array.from(members), guestCount);
+          onlineGuestsCount = guests;
+          updateForumStatsUI(Array.from(members), guests);
         })
         .subscribe(async (status) => {
           if (status === 'SUBSCRIBED') await trackUserPresence();
@@ -1041,19 +1113,29 @@
       await presenceChannel.track({ username, online_at: new Date().toISOString() });
     }
 
-    function updateOnlineUI(memberList, guestCount) {
-      const box = document.getElementById('whosOnlineText');
-      if (box) {
-        const total = memberList.length + guestCount;
-        const formattedMembers = memberList.length > 0
-          ? memberList.map(name => name.toLowerCase() === 'biggie' ? `<b style="color:#c0392b;">${escapeHtml(name)}</b>` : `<b>${escapeHtml(name)}</b>`).join(', ')
-          : 'None';
+    async function updateForumStatsUI(memberList, guestCount) {
+      const box = document.getElementById('forumStatsBody');
+      if (!box) return;
 
-        box.innerHTML = `
-          There are currently <b>${total}</b> users online (${memberList.length} members, ${guestCount} guests).<br/>
-          <span style="color:#6e655f;">Active Members:</span> ${formattedMembers}
-        `;
-      }
+      const { count: totalMsgs } = await db.from('messages').select('*', { count: 'exact', head: true });
+      const { count: totalReps } = await db.from('replies').select('*', { count: 'exact', head: true });
+      const { data: profiles } = await db.from('profiles').select('username');
+
+      const totalPosts = (totalMsgs || 0) + (totalReps || 0);
+      const totalMembers = profiles ? profiles.length : 0;
+      const newestMember = totalMembers > 0 ? profiles[profiles.length - 1].username : 'None';
+      const totalOnline = memberList.length + guestCount;
+
+      const formattedMembers = memberList.length > 0
+        ? memberList.map(name => name.toLowerCase() === 'biggie' ? `<b style="color:#c0392b;">${escapeHtml(name)}</b>` : `<b>${escapeHtml(name)}</b>`).join(', ')
+        : 'None';
+
+      box.innerHTML = `
+        There are currently <b>${totalOnline}</b> users online (${memberList.length} members, ${guestCount} guests).<br/>
+        <span style="color:#6e655f;">Active Members:</span> ${formattedMembers}<br/><hr style="border:0; border-top:1px dashed #e8ccc0; margin:6px 0;"/>
+        Total posts: <b>${totalPosts}</b> &bull; Total members: <b>${totalMembers}</b> &bull; Newest member: <b>${escapeHtml(newestMember)}</b><br/>
+        <span style="font-size:10px; color:#7a7267;">Most users ever online was <b>24</b> on Nov 14, 2026.</span>
+      `;
     }
 
     function updateAuthState(user) {
@@ -1106,7 +1188,7 @@
     }
 
     function switchView(viewId) {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch', 'viewMemberList'].forEach(id => {
         document.getElementById(id).classList.toggle('hidden', id !== viewId);
       });
     }
@@ -1115,7 +1197,10 @@
       currentBoard = null;
       currentThread = null;
       switchView('viewIndex');
-      document.getElementById('breadcrumbNav').innerHTML = `<a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a>`;
+      document.getElementById('breadcrumbNav').innerHTML = `
+        <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a>
+        <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
+      `;
 
       const { data: threads } = await db.from('messages').select('id, category, username, created_at, title');
       const { data: replies } = await db.from('replies').select('id, thread_id, username, created_at');
@@ -1156,6 +1241,8 @@
           </tr>
         `;
       }).join('');
+
+      updateForumStatsUI(Array.from(onlineUsernames), onlineGuestsCount);
     }
 
     async function openBoard(boardName) {
@@ -1165,12 +1252,14 @@
       document.getElementById('currentBoardTitle').textContent = boardName;
       document.getElementById('breadcrumbNav').innerHTML = `
         <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; <b>${escapeHtml(boardName)}</b>
+        <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
       const { data: threads, error } = await db
         .from('messages')
         .select('*')
         .eq('category', boardName)
+        .order('is_sticky', { ascending: false })
         .order('created_at', { ascending: false });
 
       const { data: replies } = await db.from('replies').select('id, thread_id');
@@ -1187,12 +1276,17 @@
         return;
       }
 
+      const isAdmin = currentUser && (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase() === 'biggie';
+
       tbody.innerHTML = threads.map((t, idx) => {
         const replyCount = allReplies.filter(r => r.thread_id === t.id).length;
-        const rowClass = idx % 2 === 0 ? 'row-odd' : 'row-even';
+        const rowClass = t.is_sticky ? 'sticky-row' : (idx % 2 === 0 ? 'row-odd' : 'row-even');
+        const stickyPrefix = t.is_sticky ? '<b style="color:#e67e22;">[Sticky] 📌</b> ' : '';
+        const stickyBtn = isAdmin ? ` <button style="font-size:9px; padding:1px 4px;" onclick="toggleSticky(${t.id}, ${!t.is_sticky})">${t.is_sticky ? 'Unpin' : 'Pin'}</button>` : '';
+
         return `
           <tr class="${rowClass}">
-            <td><a href="javascript:void(0)" onclick="openThread(${t.id}, 1)">${escapeHtml(t.title || 'Untitled Thread')}</a></td>
+            <td>${stickyPrefix}<a href="javascript:void(0)" onclick="openThread(${t.id}, 1)">${escapeHtml(t.title || 'Untitled Thread')}</a>${stickyBtn}</td>
             <td>${escapeHtml(t.username || 'Member')}</td>
             <td class="center-col">${replyCount}</td>
             <td class="last-post-col">${formatDate(t.created_at)}</td>
@@ -1203,6 +1297,11 @@
 
     function toggleNewThreadForm() {
       document.getElementById('newThreadForm').classList.toggle('hidden');
+    }
+
+    async function toggleSticky(threadId, makeSticky) {
+      const { error } = await db.from('messages').update({ is_sticky: makeSticky }).eq('id', threadId);
+      if (!error && currentBoard) openBoard(currentBoard);
     }
 
     async function createThread() {
@@ -1283,6 +1382,7 @@
         <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; 
         <a href="javascript:void(0)" onclick="openBoard('${escapeHtml(thread.category)}')">${escapeHtml(thread.category)}</a> &raquo; 
         <b>${escapeHtml(thread.title || 'Thread')}</b>
+        <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
       const { data: replies } = await db
