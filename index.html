@@ -68,6 +68,11 @@
       color: #fdebd0;
       margin-top: 2px;
     }
+    .banner-search {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
 
     /* Sub-header / User Bar */
     .user-bar {
@@ -265,6 +270,40 @@
       padding: 3px;
       background: #fff9f5;
     }
+    .post-signature {
+      margin-top: 16px;
+      padding-top: 8px;
+      border-top: 1px solid #e8ccc0;
+      font-size: 10px;
+      color: #6e655f;
+      font-style: italic;
+    }
+
+    /* BBCode Bar */
+    .bbcode-bar {
+      display: flex;
+      gap: 3px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+    .bbcode-bar button {
+      padding: 2px 6px;
+      font-size: 10px;
+      background: #fff;
+    }
+
+    /* BBCode Quotes */
+    .bbcode-quote {
+      background: #fff9f2;
+      border-left: 3px solid #e67e22;
+      border-top: 1px solid #f3dcd1;
+      border-right: 1px solid #f3dcd1;
+      border-bottom: 1px solid #f3dcd1;
+      padding: 6px 8px;
+      margin: 6px 0;
+      font-size: 11px;
+      color: #555;
+    }
 
     /* Pagination Bar */
     .pagination-bar {
@@ -359,7 +398,7 @@
 </head>
 <body>
   <div class="forum-wrapper">
-    <!-- Top Header with Cantaloupe Image/Logo -->
+    <!-- Top Header with Cantaloupe Image/Logo & Search -->
     <div class="top-banner">
       <div class="banner-brand" onclick="showIndex()">
         <div class="cantaloupe-logo">🍈</div>
@@ -368,7 +407,9 @@
           <div class="site-subtitle">Official Community Message Boards &bull; Est. 2026</div>
         </div>
       </div>
-      <div>
+      <div class="banner-search">
+        <input type="text" id="searchInput" placeholder="Search forums..." style="width:130px; height:24px;" />
+        <button onclick="performSearch()">Search</button>
         <button onclick="showIndex()">Board Index</button>
       </div>
     </div>
@@ -384,6 +425,7 @@
         <button onclick="signUp()">Register</button>
       </div>
       <div id="loggedInControls" class="hidden" style="display:flex; gap:6px; align-items:center;">
+        <button id="inboxBtn" onclick="openInbox()">Inbox (0)</button>
         <button class="primary-btn" onclick="toggleProfileEditor()">Edit Profile</button>
         <button onclick="signOut()">Log Out</button>
       </div>
@@ -395,9 +437,51 @@
       <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a>
     </div>
 
+    <!-- PRIVATE MESSAGING (INBOX / COMPOSE) VIEW -->
+    <div id="viewInbox" class="hidden">
+      <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1; display:flex; justify-content:space-between; align-items:center;">
+        <strong style="font-size:13px; color:#d35400;">Private Messages</strong>
+        <button class="primary-btn" onclick="toggleComposePM()">+ Send New Message</button>
+      </div>
+
+      <!-- Compose PM Form -->
+      <div id="composePMBox" class="form-box hidden">
+        <div class="form-box-header">New Private Message</div>
+        <div class="form-box-body">
+          <input type="text" id="pmRecipientInput" placeholder="Recipient Username" />
+          <input type="text" id="pmSubjectInput" placeholder="Subject" maxlength="100" />
+          <textarea id="pmBodyInput" rows="4" placeholder="Write your private message..."></textarea>
+          <button class="primary-btn" onclick="sendPM()">Send Message</button>
+          <button onclick="toggleComposePM()">Cancel</button>
+          <div id="pmStatus" class="status-msg"></div>
+        </div>
+      </div>
+
+      <div id="pmMessageView" class="form-box hidden">
+        <div class="form-box-header" id="pmViewSubject">Subject</div>
+        <div class="form-box-body">
+          <div style="font-size:10px; color:#7a7267; margin-bottom:6px;" id="pmViewMeta">From: User</div>
+          <div id="pmViewContent" style="white-space:pre-wrap; line-height:1.45; margin-bottom:10px;">Body</div>
+          <button onclick="closePMMessage()">Back to Inbox</button>
+        </div>
+      </div>
+
+      <table class="forum-table" id="pmTable">
+        <thead>
+          <tr>
+            <th>Subject</th>
+            <th style="width:130px;">Sender / Recipient</th>
+            <th class="last-post-col">Date</th>
+            <th style="width:60px; text-align:center;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="pmTableBody"></tbody>
+      </table>
+    </div>
+
     <!-- PROFILE EDITOR VIEW -->
     <div id="viewProfileEditor" class="form-box hidden">
-      <div class="form-box-header">Edit Your Profile</div>
+      <div class="form-box-header">Edit Your Profile & Signature</div>
       <div class="form-box-body">
         <div style="margin-bottom: 10px;">
           <label><b>Current Avatar:</b></label><br/>
@@ -408,13 +492,34 @@
           <input type="file" id="editAvatarFileInput" accept="image/*" />
         </div>
         <div style="margin-top: 8px;">
-          <label for="editBioInput"><b>Profile Message / Status (Under Pic):</b></label>
+          <label for="editBioInput"><b>Profile Status / Bio (Under Pic):</b></label>
           <input type="text" id="editBioInput" placeholder="e.g. Cantaloupe enthusiast & wrestling archivist" maxlength="100" />
+        </div>
+        <div style="margin-top: 8px;">
+          <label for="editSignatureInput"><b>Forum Signature (Bottom of Posts):</b></label>
+          <textarea id="editSignatureInput" rows="2" placeholder="e.g. -- Official Cantaloupe Chat Moderator" maxlength="200"></textarea>
         </div>
         <button class="primary-btn" id="saveProfileBtn" onclick="saveProfileChanges()">Save Profile</button>
         <button onclick="showIndex()">Cancel</button>
         <div id="profileEditStatus" class="status-msg"></div>
       </div>
+    </div>
+
+    <!-- SEARCH RESULTS VIEW -->
+    <div id="viewSearch" class="hidden">
+      <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1;">
+        <strong style="font-size:13px; color:#d35400;">Search Results</strong>
+      </div>
+      <table class="forum-table">
+        <thead>
+          <tr>
+            <th>Thread Title / Match</th>
+            <th style="width:130px;">Author</th>
+            <th class="last-post-col">Posted</th>
+          </tr>
+        </thead>
+        <tbody id="searchResultsBody"></tbody>
+      </table>
     </div>
 
     <!-- VIEW 1: FORUM INDEX -->
@@ -452,6 +557,13 @@
         <div class="form-box-header">Post New Thread</div>
         <div class="form-box-body">
           <input type="text" id="threadTitleInput" placeholder="Thread Subject / Title" maxlength="120" />
+          <div class="bbcode-bar">
+            <button type="button" onclick="insertBBCode('threadBodyInput', 'b')"><b>B</b></button>
+            <button type="button" onclick="insertBBCode('threadBodyInput', 'i')"><i>I</i></button>
+            <button type="button" onclick="insertBBCode('threadBodyInput', 'u')"><u>U</u></button>
+            <button type="button" onclick="insertBBCode('threadBodyInput', 'url')">URL</button>
+            <button type="button" onclick="insertBBCode('threadBodyInput', 'quote')">Quote</button>
+          </div>
           <textarea id="threadBodyInput" rows="5" placeholder="Enter your message here..."></textarea>
           <div class="file-upload-row">
             <label for="threadImageInput"><b>Attach Image (Optional):</b></label>
@@ -490,12 +602,20 @@
       <div id="replyFormBox" class="form-box hidden">
         <div class="form-box-header">Post a Reply</div>
         <div class="form-box-body">
+          <div class="bbcode-bar">
+            <button type="button" onclick="insertBBCode('replyBodyInput', 'b')"><b>B</b></button>
+            <button type="button" onclick="insertBBCode('replyBodyInput', 'i')"><i>I</i></button>
+            <button type="button" onclick="insertBBCode('replyBodyInput', 'u')"><u>U</u></button>
+            <button type="button" onclick="insertBBCode('replyBodyInput', 'url')">URL</button>
+            <button type="button" onclick="insertBBCode('replyBodyInput', 'quote')">Quote</button>
+          </div>
           <textarea id="replyBodyInput" rows="4" placeholder="Write your reply to this thread..."></textarea>
           <div class="file-upload-row">
             <label for="replyImageInput"><b>Attach Image (Optional):</b></label>
             <input type="file" id="replyImageInput" accept="image/*" />
           </div>
           <button class="primary-btn" id="submitReplyBtn" onclick="postReply()">Post Reply</button>
+          <button onclick="quoteLastPost()" type="button">Quote Last Post</button>
           <div id="replyStatus" class="status-msg"></div>
         </div>
       </div>
@@ -530,6 +650,7 @@
     let presenceChannel = null;
     let onlineUsernames = new Set();
     let userProfiles = {};
+    let allLoadedPosts = [];
     const sessionKey = 'guest-' + Math.random().toString(36).substring(2, 10);
 
     async function init() {
@@ -544,6 +665,7 @@
       await loadProfiles();
       setupPresence();
       await showIndex();
+      if (currentUser) updateInboxCount();
 
       db.channel('forum-realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
@@ -562,18 +684,23 @@
           await loadProfiles();
           if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage);
         })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'private_messages' }, () => {
+          if (currentUser) updateInboxCount();
+          if (!document.getElementById('viewInbox').classList.contains('hidden')) openInbox();
+        })
         .subscribe();
     }
 
     async function loadProfiles() {
-      const { data } = await db.from('profiles').select('username, avatar_url, bio');
+      const { data } = await db.from('profiles').select('username, avatar_url, bio, signature');
       if (data) {
         userProfiles = {};
         data.forEach(p => {
           if (p.username) {
             userProfiles[p.username.toLowerCase()] = {
               avatar_url: p.avatar_url || '',
-              bio: p.bio || ''
+              bio: p.bio || '',
+              signature: p.signature || ''
             };
           }
         });
@@ -594,7 +721,7 @@
     }
 
     function toggleProfileEditor() {
-      ['viewIndex', 'viewBoard', 'viewThread'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewInbox', 'viewSearch'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
       document.getElementById('viewProfileEditor').classList.remove('hidden');
@@ -606,6 +733,7 @@
         const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
         const profile = userProfiles[username.toLowerCase()] || {};
         document.getElementById('editBioInput').value = profile.bio || '';
+        document.getElementById('editSignatureInput').value = profile.signature || '';
         document.getElementById('editProfileAvatarPreview').src = profile.avatar_url || '';
       }
     }
@@ -614,11 +742,13 @@
       if (!currentUser) return;
       const fileInput = document.getElementById('editAvatarFileInput');
       const bioInput = document.getElementById('editBioInput');
+      const sigInput = document.getElementById('editSignatureInput');
       const status = document.getElementById('profileEditStatus');
       const btn = document.getElementById('saveProfileBtn');
 
       const file = fileInput.files[0];
       const bio = bioInput.value.trim();
+      const signature = sigInput.value.trim();
       const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
       const lKey = username.toLowerCase();
 
@@ -636,12 +766,13 @@
         const { error } = await db.from('profiles').upsert({
           username: username,
           avatar_url: avatarUrl,
-          bio: bio
+          bio: bio,
+          signature: signature
         });
 
         if (error) throw error;
 
-        userProfiles[lKey] = { avatar_url: avatarUrl, bio: bio };
+        userProfiles[lKey] = { avatar_url: avatarUrl, bio: bio, signature: signature };
         status.style.color = '#27ae60';
         status.textContent = 'Profile updated successfully!';
         fileInput.value = '';
@@ -652,6 +783,198 @@
       } finally {
         btn.disabled = false;
       }
+    }
+
+    // BBCode Helpers
+    function insertBBCode(textareaId, tag) {
+      const ta = document.getElementById(textareaId);
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const val = ta.value;
+      const selected = val.substring(start, end);
+
+      let replacement = '';
+      if (tag === 'url') {
+        const url = prompt('Enter URL:', 'https://');
+        if (!url) return;
+        replacement = `[url=${url}]${selected || url}[/url]`;
+      } else {
+        replacement = `[${tag}]${selected}[/${tag}]`;
+      }
+
+      ta.value = val.substring(0, start) + replacement + val.substring(end);
+      ta.focus();
+      ta.setSelectionRange(start + replacement.length, start + replacement.length);
+    }
+
+    function quoteLastPost() {
+      if (allLoadedPosts.length === 0) return;
+      const last = allLoadedPosts[allLoadedPosts.length - 1];
+      const replyTa = document.getElementById('replyBodyInput');
+      replyTa.value = `[quote=${last.username}]${last.message}[/quote]\n`;
+      replyTa.focus();
+    }
+
+    // Private Messaging Functions
+    async function updateInboxCount() {
+      if (!currentUser) return;
+      const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      const { data } = await db
+        .from('private_messages')
+        .select('id, read_status')
+        .eq('recipient_username', username)
+        .eq('read_status', false);
+
+      const unread = data ? data.length : 0;
+      document.getElementById('inboxBtn').textContent = unread > 0 ? `Inbox (${unread} New)` : `Inbox (0)`;
+    }
+
+    async function openInbox() {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewSearch'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById('viewInbox').classList.remove('hidden');
+      document.getElementById('composePMBox').classList.add('hidden');
+      document.getElementById('pmMessageView').classList.add('hidden');
+      document.getElementById('pmTable').classList.remove('hidden');
+
+      document.getElementById('breadcrumbNav').innerHTML = `
+        <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; <b>Private Messages</b>
+      `;
+
+      if (!currentUser) return;
+      const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+
+      const { data: pms } = await db
+        .from('private_messages')
+        .select('*')
+        .or(`recipient_username.eq.${username},sender_username.eq.${username}`)
+        .order('created_at', { ascending: false });
+
+      const tbody = document.getElementById('pmTableBody');
+      if (!pms || pms.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:18px; color:#555;">Your inbox is empty.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = pms.map((pm, idx) => {
+        const isIncoming = pm.recipient_username.toLowerCase() === username.toLowerCase();
+        const otherUser = isIncoming ? pm.sender_username : pm.recipient_username;
+        const unreadBold = (isIncoming && !pm.read_status) ? 'font-weight:bold; color:#d35400;' : '';
+        const rowClass = idx % 2 === 0 ? 'row-odd' : 'row-even';
+
+        return `
+          <tr class="${rowClass}">
+            <td><a href="javascript:void(0)" style="${unreadBold}" onclick="readPM(${pm.id})">${escapeHtml(pm.subject)}</a></td>
+            <td>${isIncoming ? 'From: ' : 'To: '}<b>${escapeHtml(otherUser)}</b></td>
+            <td class="last-post-col">${formatDate(pm.created_at)}</td>
+            <td style="text-align:center;"><button onclick="deletePM(${pm.id})">Delete</button></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function toggleComposePM() {
+      document.getElementById('composePMBox').classList.toggle('hidden');
+    }
+
+    async function sendPM() {
+      if (!currentUser) return;
+      const recipient = document.getElementById('pmRecipientInput').value.trim();
+      const subject = document.getElementById('pmSubjectInput').value.trim();
+      const body = document.getElementById('pmBodyInput').value.trim();
+      const status = document.getElementById('pmStatus');
+
+      if (!recipient || !subject || !body) {
+        status.textContent = 'Please fill out recipient, subject, and message.';
+        return;
+      }
+
+      const senderUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      status.textContent = 'Sending message...';
+
+      const { error } = await db.from('private_messages').insert({
+        sender_id: currentUser.id,
+        sender_username: senderUsername,
+        recipient_username: recipient,
+        subject: subject,
+        message: body,
+        read_status: false
+      });
+
+      if (error) {
+        status.textContent = error.message;
+      } else {
+        document.getElementById('pmRecipientInput').value = '';
+        document.getElementById('pmSubjectInput').value = '';
+        document.getElementById('pmBodyInput').value = '';
+        status.textContent = '';
+        toggleComposePM();
+        openInbox();
+      }
+    }
+
+    async function readPM(pmId) {
+      const { data: pm } = await db.from('private_messages').select('*').eq('id', pmId).single();
+      if (!pm) return;
+
+      const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      if (pm.recipient_username.toLowerCase() === username.toLowerCase() && !pm.read_status) {
+        await db.from('private_messages').update({ read_status: true }).eq('id', pmId);
+        updateInboxCount();
+      }
+
+      document.getElementById('pmTable').classList.add('hidden');
+      document.getElementById('composePMBox').classList.add('hidden');
+      document.getElementById('pmMessageView').classList.remove('hidden');
+
+      document.getElementById('pmViewSubject').textContent = pm.subject;
+      document.getElementById('pmViewMeta').textContent = `From: ${pm.sender_username} | To: ${pm.recipient_username} | Date: ${formatDate(pm.created_at)}`;
+      document.getElementById('pmViewContent').innerHTML = formatPostBody(pm.message);
+    }
+
+    async function deletePM(pmId) {
+      if (!confirm('Are you sure you want to delete this message?')) return;
+      await db.from('private_messages').delete().eq('id', pmId);
+      openInbox();
+      updateInboxCount();
+    }
+
+    // Search Functionality
+    async function performSearch() {
+      const query = document.getElementById('searchInput').value.trim();
+      if (!query) return;
+
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById('viewSearch').classList.remove('hidden');
+      document.getElementById('breadcrumbNav').innerHTML = `
+        <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; <b>Search: ${escapeHtml(query)}</b>
+      `;
+
+      const { data: messages } = await db
+        .from('messages')
+        .select('*')
+        .or(`title.ilike.%${query}%,message.ilike.%${query}%`)
+        .order('created_at', { ascending: false });
+
+      const tbody = document.getElementById('searchResultsBody');
+      if (!messages || messages.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:18px; color:#555;">No matching threads found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = messages.map((m, idx) => {
+        const rowClass = idx % 2 === 0 ? 'row-odd' : 'row-even';
+        return `
+          <tr class="${rowClass}">
+            <td><a href="javascript:void(0)" onclick="openThread(${m.id}, 1)">${escapeHtml(m.title)}</a><div class="board-desc">Category: ${escapeHtml(m.category)}</div></td>
+            <td>${escapeHtml(m.username)}</td>
+            <td class="last-post-col">${formatDate(m.created_at)}</td>
+          </tr>
+        `;
+      }).join('');
     }
 
     async function castVote(targetId, targetType, voteType) {
@@ -734,6 +1057,7 @@
       if (user) {
         const name = user.user_metadata?.username || user.email.split('@')[0];
         welcome.innerHTML = `Logged in as: <b>${escapeHtml(name)}</b>`;
+        updateInboxCount();
       } else {
         welcome.innerHTML = `Welcome, <b>Guest</b>! Please log in or register to post threads and replies.`;
       }
@@ -777,7 +1101,7 @@
     }
 
     function switchView(viewId) {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch'].forEach(id => {
         document.getElementById(id).classList.toggle('hidden', id !== viewId);
       });
     }
@@ -961,13 +1285,13 @@
       if (page > totalPages) page = totalPages;
       if (page < 1) page = 1;
 
-      const allPosts = [
+      allLoadedPosts = [
         { ...thread, isOP: true, targetType: 'message', globalIndex: 1 },
         ...allReplies.map((r, i) => ({ ...r, isOP: false, targetType: 'reply', globalIndex: i + 2 }))
       ];
 
       const startIndex = (page - 1) * POSTS_PER_PAGE;
-      const pagePosts = allPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
+      const pagePosts = allLoadedPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
 
       const { data: allUserThreads } = await db.from('messages').select('username');
       const { data: allUserReplies } = await db.from('replies').select('username');
@@ -989,6 +1313,7 @@
         const profile = userProfiles[uname.toLowerCase()] || {};
         const avatarUrl = profile.avatar_url;
         const bio = profile.bio;
+        const signature = profile.signature;
 
         const postVotes = (allVotes || []).filter(v => v.target_id === p.id && v.target_type === p.targetType);
         const score = postVotes.reduce((acc, v) => acc + v.vote_type, 0);
@@ -1026,7 +1351,10 @@
                     Posts: <b>${postCount}</b>
                   </div>
                 </td>
-                <td class="post-content-cell">${formatPostBody(p.message)}</td>
+                <td class="post-content-cell">
+                  ${formatPostBody(p.message)}
+                  ${signature ? `<div class="post-signature">${formatPostBody(signature)}</div>` : ''}
+                </td>
               </tr>
             </table>
           </div>
@@ -1111,8 +1439,18 @@
     }
 
     function formatPostBody(str) {
-      const safe = escapeHtml(str);
-      return safe.replace(/(https?:\/\/[^\s<]+)/g, url => {
+      let safe = escapeHtml(str);
+
+      // Parse BBCode
+      safe = safe.replace(/\[b\](.*?)\[\/b\]/gis, '<b>$1</b>');
+      safe = safe.replace(/\[i\](.*?)\[\/i\]/gis, '<i>$1</i>');
+      safe = safe.replace(/\[u\](.*?)\[\/u\]/gis, '<u>$1</u>');
+      safe = safe.replace(/\[url=(.*?)\](.*?)\[\/url\]/gis, '<a href="$1" target="_blank" rel="noopener noreferrer">$2</a>');
+      safe = safe.replace(/\[quote=(.*?)\](.*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote by $1:</b><br/>$2</div>');
+      safe = safe.replace(/\[quote\](.*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote:</b><br/>$1</div>');
+
+      // Parse Links & Images
+      return safe.replace(/(https?:\/\/[^\s<"]+)/g, url => {
         const cleanUrl = url.replace(/[.,!?;:)\]]+$/, '');
         const trailing = url.slice(cleanUrl.length);
         if (/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(cleanUrl)) {
