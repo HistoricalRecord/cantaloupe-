@@ -287,6 +287,14 @@
       color: #6e655f;
       font-style: italic;
     }
+    .ignored-post-notice {
+      padding: 12px;
+      font-size: 11px;
+      color: #7a7267;
+      font-style: italic;
+      background: #f9f9f9;
+      text-align: center;
+    }
 
     /* BBCode Bar */
     .bbcode-bar {
@@ -497,7 +505,7 @@
         <thead>
           <tr>
             <th>Username</th>
-            <th>Rank</th>
+            <th>Rank / Title</th>
             <th class="center-col">Total Posts</th>
             <th>Status / Bio</th>
           </tr>
@@ -508,7 +516,7 @@
 
     <!-- PROFILE EDITOR VIEW -->
     <div id="viewProfileEditor" class="form-box hidden">
-      <div class="form-box-header">Edit Your Profile & Signature</div>
+      <div class="form-box-header">Edit Your Profile, Title & Signature</div>
       <div class="form-box-body">
         <div style="margin-bottom: 10px;">
           <label><b>Current Avatar:</b></label><br/>
@@ -521,6 +529,10 @@
         <div style="margin-top: 8px;">
           <label for="editBioInput"><b>Profile Status / Bio (Under Pic):</b></label>
           <input type="text" id="editBioInput" placeholder="e.g. Cantaloupe enthusiast & wrestling archivist" maxlength="100" />
+        </div>
+        <div id="customTitleRow" style="margin-top: 8px; display:none;">
+          <label for="editCustomTitleInput"><b>Custom User Title (Unlocked at 100+ Posts):</b></label>
+          <input type="text" id="editCustomTitleInput" placeholder="e.g. Cantaloupe Connoisseur" maxlength="40" />
         </div>
         <div style="margin-top: 8px;">
           <label for="editSignatureInput"><b>Forum Signature (Bottom of Posts):</b></label>
@@ -564,6 +576,12 @@
           <tr><td colspan="4" style="text-align:center; padding:16px;">Loading boards...</td></tr>
         </tbody>
       </table>
+
+      <!-- Admin Reports Section (Only visible to admin 'biggie') -->
+      <div id="adminReportsBox" class="stats-box hidden" style="border-top:2px solid #c0392b;">
+        <div class="stats-header" style="background:linear-gradient(180deg, #e74c3c 0%, #c0392b 100%);">Admin Moderation Queue (Reported Posts)</div>
+        <div class="stats-body" id="adminReportsBody">Loading reports...</div>
+      </div>
 
       <!-- Who's Online & Board Stats Box -->
       <div class="stats-box">
@@ -678,6 +696,8 @@
     let onlineUsernames = new Set();
     let onlineGuestsCount = 0;
     let userProfiles = {};
+    let ignoredUsers = new Set();
+    let globalPostCounts = {};
     let allLoadedPosts = [];
     const sessionKey = 'guest-' + Math.random().toString(36).substring(2, 10);
 
@@ -691,6 +711,7 @@
       });
 
       await loadProfiles();
+      await loadIgnoredUsers();
       setupPresence();
       await showIndex();
       if (currentUser) updateInboxCount();
@@ -716,11 +737,14 @@
           if (currentUser) updateInboxCount();
           if (!document.getElementById('viewInbox').classList.contains('hidden')) openInbox();
         })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'post_reports' }, () => {
+          if (!document.getElementById('viewIndex').classList.contains('hidden')) showIndex();
+        })
         .subscribe();
     }
 
     async function loadProfiles() {
-      const { data } = await db.from('profiles').select('username, avatar_url, bio, signature');
+      const { data } = await db.from('profiles').select('username, avatar_url, bio, signature, custom_title');
       if (data) {
         userProfiles = {};
         data.forEach(p => {
@@ -728,10 +752,47 @@
             userProfiles[p.username.toLowerCase()] = {
               avatar_url: p.avatar_url || '',
               bio: p.bio || '',
-              signature: p.signature || ''
+              signature: p.signature || '',
+              custom_title: p.custom_title || ''
             };
           }
         });
+      }
+    }
+
+    async function loadIgnoredUsers() {
+      if (!currentUser) {
+        ignoredUsers = new Set();
+        return;
+      }
+      const { data } = await db.from('ignore_list').select('ignored_username').eq('user_id', currentUser.id);
+      ignoredUsers = new Set((data || []).map(i => i.ignored_username.toLowerCase()));
+    }
+
+    async function toggleIgnoreUser(username) {
+      if (!currentUser) {
+        alert('Please log in to manage ignore lists.');
+        return;
+      }
+      const lName = username.toLowerCase();
+      const myName = (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase();
+      if (lName === myName) {
+        alert('You cannot ignore yourself.');
+        return;
+      }
+
+      if (ignoredUsers.has(lName)) {
+        await db.from('ignore_list').delete().eq('user_id', currentUser.id).eq('ignored_username', username);
+        ignoredUsers.delete(lName);
+        alert(`You are no longer ignoring ${username}.`);
+      } else {
+        await db.from('ignore_list').insert({ user_id: currentUser.id, ignored_username: username });
+        ignoredUsers.add(lName);
+        alert(`You are now ignoring ${username}. Their posts will be hidden.`);
+      }
+
+      if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) {
+        openThread(currentThread.id, currentThreadPage);
       }
     }
 
@@ -748,7 +809,7 @@
       return data.publicUrl;
     }
 
-    function toggleProfileEditor() {
+    async function toggleProfileEditor() {
       ['viewIndex', 'viewBoard', 'viewThread', 'viewInbox', 'viewSearch', 'viewMemberList'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
@@ -764,6 +825,15 @@
         document.getElementById('editBioInput').value = profile.bio || '';
         document.getElementById('editSignatureInput').value = profile.signature || '';
         document.getElementById('editProfileAvatarPreview').src = profile.avatar_url || '';
+
+        const myPostCount = globalPostCounts[username.toLowerCase()] || 0;
+        const customTitleRow = document.getElementById('customTitleRow');
+        if (myPostCount >= 100 || username.toLowerCase() === 'biggie') {
+          customTitleRow.style.display = 'block';
+          document.getElementById('editCustomTitleInput').value = profile.custom_title || '';
+        } else {
+          customTitleRow.style.display = 'none';
+        }
       }
     }
 
@@ -772,12 +842,14 @@
       const fileInput = document.getElementById('editAvatarFileInput');
       const bioInput = document.getElementById('editBioInput');
       const sigInput = document.getElementById('editSignatureInput');
+      const titleInput = document.getElementById('editCustomTitleInput');
       const status = document.getElementById('profileEditStatus');
       const btn = document.getElementById('saveProfileBtn');
 
       const file = fileInput.files[0];
       const bio = bioInput.value.trim();
       const signature = sigInput.value.trim();
+      const customTitle = titleInput ? titleInput.value.trim() : '';
       const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
       const lKey = username.toLowerCase();
 
@@ -796,12 +868,13 @@
           username: username,
           avatar_url: avatarUrl,
           bio: bio,
-          signature: signature
+          signature: signature,
+          custom_title: customTitle
         });
 
         if (error) throw error;
 
-        userProfiles[lKey] = { avatar_url: avatarUrl, bio: bio, signature: signature };
+        userProfiles[lKey] = { avatar_url: avatarUrl, bio: bio, signature: signature, custom_title: customTitle };
         status.style.color = '#27ae60';
         status.textContent = 'Profile updated successfully!';
         fileInput.value = '';
@@ -844,6 +917,35 @@
       replyTa.focus();
     }
 
+    // Post Reporting
+    async function reportPost(targetId, targetType) {
+      if (!currentUser) {
+        alert('Please log in to report posts.');
+        return;
+      }
+      const reason = prompt('Please enter the reason for reporting this post:', 'Spam / Inappropriate content');
+      if (!reason) return;
+
+      const reporter = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      const { error } = await db.from('post_reports').insert({
+        reporter_username: reporter,
+        target_id: targetId,
+        target_type: targetType,
+        reason: reason
+      });
+
+      if (error) {
+        alert('Error reporting post: ' + error.message);
+      } else {
+        alert('Post reported successfully to moderators.');
+      }
+    }
+
+    async function dismissReport(reportId) {
+      await db.from('post_reports').delete().eq('id', reportId);
+      showIndex();
+    }
+
     // Member Directory
     async function openMemberList() {
       ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewSearch', 'viewInbox'].forEach(id => {
@@ -856,15 +958,6 @@
       `;
 
       const { data: profiles } = await db.from('profiles').select('*');
-      const { data: threads } = await db.from('messages').select('username');
-      const { data: replies } = await db.from('replies').select('username');
-
-      const counts = {};
-      [...(threads || []), ...(replies || [])].forEach(item => {
-        const u = item.username || 'Member';
-        counts[u] = (counts[u] || 0) + 1;
-      });
-
       const tbody = document.getElementById('memberListBody');
       if (!profiles || profiles.length === 0) {
         tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:18px;">No members registered yet.</td></tr>`;
@@ -873,15 +966,15 @@
 
       tbody.innerHTML = profiles.map((p, idx) => {
         const uname = p.username || 'Member';
-        const postCount = counts[uname] || 0;
-        const rankData = getUserRankAndStars(postCount);
+        const postCount = globalPostCounts[uname.toLowerCase()] || 0;
+        const rankData = getUserRankAndTitle(postCount, p.custom_title);
         const rowClass = idx % 2 === 0 ? 'row-odd' : 'row-even';
         const isAdmin = uname.toLowerCase() === 'biggie';
 
         return `
           <tr class="${rowClass}">
             <td><b>${escapeHtml(uname)}</b> ${isAdmin ? '<span class="admin-badge">Admin</span>' : ''}</td>
-            <td>${rankData.rank} ${rankData.stars}</td>
+            <td>${escapeHtml(rankData.rankTitle)} ${rankData.stars}</td>
             <td class="center-col">${postCount}</td>
             <td>${escapeHtml(p.bio || 'No status message.')}</td>
           </tr>
@@ -1117,11 +1210,18 @@
       const box = document.getElementById('forumStatsBody');
       if (!box) return;
 
-      const { count: totalMsgs } = await db.from('messages').select('*', { count: 'exact', head: true });
-      const { count: totalReps } = await db.from('replies').select('*', { count: 'exact', head: true });
+      const { data: allThreads } = await db.from('messages').select('username');
+      const { data: allReplies } = await db.from('replies').select('username');
       const { data: profiles } = await db.from('profiles').select('username');
 
-      const totalPosts = (totalMsgs || 0) + (totalReps || 0);
+      globalPostCounts = {};
+      [...(allThreads || []), ...(allReplies || [])].forEach(item => {
+        const u = item.username || 'Member';
+        const lKey = u.toLowerCase();
+        globalPostCounts[lKey] = (globalPostCounts[lKey] || 0) + 1;
+      });
+
+      const totalPosts = (allThreads || []).length + (allReplies || []).length;
       const totalMembers = profiles ? profiles.length : 0;
       const newestMember = totalMembers > 0 ? profiles[profiles.length - 1].username : 'None';
       const totalOnline = memberList.length + guestCount;
@@ -1136,6 +1236,24 @@
         Total posts: <b>${totalPosts}</b> &bull; Total members: <b>${totalMembers}</b> &bull; Newest member: <b>${escapeHtml(newestMember)}</b><br/>
         <span style="font-size:10px; color:#7a7267;">Most users ever online was <b>24</b> on Nov 14, 2026.</span>
       `;
+
+      // Check admin reports box
+      const isAdmin = currentUser && (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase() === 'biggie';
+      const reportsBox = document.getElementById('adminReportsBox');
+      if (isAdmin) {
+        const { data: reports } = await db.from('post_reports').select('*').order('created_at', { ascending: false });
+        reportsBox.classList.toggle('hidden', !reports || reports.length === 0);
+        if (reports && reports.length > 0) {
+          document.getElementById('adminReportsBody').innerHTML = reports.map(r => `
+            <div style="padding:4px 0; border-bottom:1px solid #f3dcd1; font-size:11px;">
+              <b>[${r.target_type.toUpperCase()} #${r.target_id}]</b> Reported by <b>${escapeHtml(r.reporter_username)}</b>: "${escapeHtml(r.reason)}" (${formatDate(r.created_at)})
+              <button style="font-size:9px; padding:1px 4px; margin-left:6px;" onclick="dismissReport(${r.id})">Dismiss</button>
+            </div>
+          `).join('');
+        }
+      } else {
+        reportsBox.classList.add('hidden');
+      }
     }
 
     function updateAuthState(user) {
@@ -1145,8 +1263,10 @@
         const name = user.user_metadata?.username || user.email.split('@')[0];
         welcome.innerHTML = `Logged in as: <b>${escapeHtml(name)}</b>`;
         updateInboxCount();
+        loadIgnoredUsers();
       } else {
         welcome.innerHTML = `Welcome, <b>Guest</b>! Please log in or register to post threads and replies.`;
+        ignoredUsers = new Set();
       }
       document.getElementById('loggedOutControls').classList.toggle('hidden', !!user);
       document.getElementById('loggedInControls').classList.toggle('hidden', !user);
@@ -1358,12 +1478,15 @@
       }
     }
 
-    function getUserRankAndStars(postCount) {
-      if (postCount >= 500) return { rank: 'Forum Veteran', stars: '⭐⭐⭐⭐⭐' };
-      if (postCount >= 200) return { rank: 'Senior Member', stars: '⭐⭐⭐⭐' };
-      if (postCount >= 50) return { rank: 'Full Member', stars: '⭐⭐⭐' };
-      if (postCount >= 10) return { rank: 'Junior Member', stars: '⭐⭐' };
-      return { rank: 'Newbie', stars: '⭐' };
+    function getUserRankAndTitle(postCount, customTitle) {
+      if (customTitle && customTitle.trim() !== '') {
+        return { rankTitle: escapeHtml(customTitle), stars: postCount >= 500 ? '⭐⭐⭐⭐⭐' : (postCount >= 200 ? '⭐⭐⭐⭐' : (postCount >= 50 ? '⭐⭐⭐' : '⭐⭐')) };
+      }
+      if (postCount >= 500) return { rankTitle: 'Forum Veteran', stars: '⭐⭐⭐⭐⭐' };
+      if (postCount >= 200) return { rankTitle: 'Senior Member', stars: '⭐⭐⭐⭐' };
+      if (postCount >= 50) return { rankTitle: 'Full Member', stars: '⭐⭐⭐' };
+      if (postCount >= 10) return { rankTitle: 'Junior Member', stars: '⭐⭐' };
+      return { rankTitle: 'Newbie', stars: '⭐' };
     }
 
     async function openThread(threadId, page = 1) {
@@ -1406,35 +1529,47 @@
       const startIndex = (page - 1) * POSTS_PER_PAGE;
       const pagePosts = allLoadedPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
 
-      const { data: allUserThreads } = await db.from('messages').select('username');
-      const { data: allUserReplies } = await db.from('replies').select('username');
       const { data: allVotes } = await db.from('votes').select('*');
-
-      const counts = {};
-      [...(allUserThreads || []), ...(allUserReplies || [])].forEach(item => {
-        const u = item.username || 'Member';
-        counts[u] = (counts[u] || 0) + 1;
-      });
 
       const container = document.getElementById('threadPostsContainer');
       container.innerHTML = pagePosts.map((p) => {
         const uname = p.username || 'Member';
-        const postCount = counts[uname] || 1;
-        const isAdmin = uname.toLowerCase() === 'biggie';
-        const isOnline = onlineUsernames.has(uname.toLowerCase());
+        const lName = uname.toLowerCase();
+        const isIgnored = ignoredUsers.has(lName);
+        const postCount = globalPostCounts[lName] || 1;
+        const isAdmin = lName === 'biggie';
+        const isOnline = onlineUsernames.has(lName);
         
-        const profile = userProfiles[uname.toLowerCase()] || {};
+        const profile = userProfiles[lName] || {};
         const avatarUrl = profile.avatar_url;
         const bio = profile.bio;
         const signature = profile.signature;
+        const customTitle = profile.custom_title;
 
-        const rankData = getUserRankAndStars(postCount);
+        const rankData = getUserRankAndTitle(postCount, customTitle);
 
         const postVotes = (allVotes || []).filter(v => v.target_id === p.id && v.target_type === p.targetType);
         const score = postVotes.reduce((acc, v) => acc + v.vote_type, 0);
         const userVote = currentUser ? postVotes.find(v => v.user_id === currentUser.id)?.vote_type : 0;
         const upStyle = userVote === 1 ? 'color:#27ae60;' : '';
         const downStyle = userVote === -1 ? 'color:#c0392b;' : '';
+
+        const myName = currentUser ? (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase() : '';
+        const ignoreBtn = (currentUser && myName !== lName) 
+          ? ` <button style="font-size:9px; padding:1px 4px;" onclick="toggleIgnoreUser('${escapeHtml(uname)}')">${isIgnored ? 'Unignore' : 'Ignore'}</button>` 
+          : '';
+
+        if (isIgnored) {
+          return `
+            <div class="post-box">
+              <div class="post-header">
+                <span>Posted: ${formatDate(p.created_at)}</span>
+                <span><b>#${p.globalIndex}</b> &bull; Ignored User: <b>${escapeHtml(uname)}</b> ${ignoreBtn}</span>
+              </div>
+              <div class="ignored-post-notice">You have chosen to ignore posts by ${escapeHtml(uname)}.</div>
+            </div>
+          `;
+        }
 
         return `
           <div class="post-box">
@@ -1446,6 +1581,8 @@
                   <span class="vote-score">${score}</span>
                   <button class="vote-btn" style="${downStyle}" onclick="castVote(${p.id}, '${p.targetType}', -1)">▼</button>
                 </div>
+                <button style="font-size:9px; padding:1px 4px;" onclick="reportPost(${p.id}, '${p.targetType}')">Report</button>
+                ${ignoreBtn}
                 <span><b>#${p.globalIndex}</b> ${p.isOP ? '(Thread Starter)' : ''}</span>
               </div>
             </div>
@@ -1459,7 +1596,7 @@
                       : `<span class="status-dot status-offline"></span><span style="color:#7a7267;">Offline</span>`
                     }
                   </span>
-                  ${isAdmin ? '<div class="admin-badge">Site Admin</div>' : `<div class="author-rank">${rankData.rank}</div><div class="author-stars">${rankData.stars}</div>`}
+                  ${isAdmin ? '<div class="admin-badge">Site Admin</div>' : `<div class="author-rank">${rankData.rankTitle}</div><div class="author-stars">${rankData.stars}</div>`}
                   ${avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(uname)}'s avatar" class="author-avatar" />` : ''}
                   ${bio ? `<div class="author-bio">"${escapeHtml(bio)}"</div>` : ''}
                   <div class="author-stats">
