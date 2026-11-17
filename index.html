@@ -270,8 +270,15 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
-    .post-content-cell a { color: #1b4d89; text-decoration: underline; font-weight: normal; }
-    .post-content-cell a:hover { color: #d35400; }
+    /* Fixed Hyperlink Styling: Clean 2005 Forum Link Look */
+    .post-content-cell a { 
+      color: #1b4d89 !important; 
+      text-decoration: underline !important; 
+      font-weight: bold !important; 
+    }
+    .post-content-cell a:hover { 
+      color: #d35400 !important; 
+    }
     .post-embedded-img {
       display: block;
       max-width: 100%;
@@ -838,8 +845,14 @@
       await loadProfiles();
       await loadIgnoredUsers();
       setupPresence();
+
+      // Handle browser back/forward buttons or direct state loading on refresh
+      window.addEventListener('popstate', (event) => {
+        handleRouteState(event.state);
+      });
+
       if (currentUser) {
-        await showIndex();
+        await handleInitialRoute();
         updateInboxCount();
       } else {
         showAuthPortal();
@@ -848,28 +861,71 @@
       db.channel('forum-realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
           if (!document.getElementById('viewIndex').classList.contains('hidden')) showIndex();
-          if (!document.getElementById('viewBoard').classList.contains('hidden') && currentBoard) openBoard(currentBoard);
+          if (!document.getElementById('viewBoard').classList.contains('hidden') && currentBoard) openBoard(currentBoard, false);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'replies' }, (payload) => {
           if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread && payload.new?.thread_id === currentThread.id) {
-            openThread(currentThread.id, currentThreadPage);
+            openThread(currentThread.id, currentThreadPage, false);
           }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => {
-          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage);
+          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage, false);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async () => {
           await loadProfiles();
-          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage);
+          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage, false);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'private_messages' }, () => {
           if (currentUser) updateInboxCount();
-          if (!document.getElementById('viewInbox').classList.contains('hidden')) openInbox();
+          if (!document.getElementById('viewInbox').classList.contains('hidden')) openInbox(false);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'post_reports' }, () => {
           if (!document.getElementById('viewIndex').classList.contains('hidden')) showIndex();
         })
         .subscribe();
+    }
+
+    async function handleInitialRoute() {
+      const params = new URLSearchParams(window.location.search);
+      const threadId = params.get('thread');
+      const board = params.get('board');
+      const page = parseInt(params.get('page') || '1', 10);
+      const view = params.get('view');
+
+      if (threadId) {
+        await openThread(parseInt(threadId, 10), page, false);
+      } else if (board) {
+        await openBoard(board, false);
+      } else if (view === 'inbox') {
+        await openInbox(false);
+      } else if (view === 'members') {
+        await openMemberList(false);
+      } else if (view === 'profile') {
+        toggleProfileEditor(false);
+      } else {
+        await showIndex(false);
+      }
+    }
+
+    function handleRouteState(state) {
+      if (!currentUser) return;
+      if (!state) {
+        showIndex(false);
+        return;
+      }
+      if (state.view === 'thread') {
+        openThread(state.threadId, state.page, false);
+      } else if (state.view === 'board') {
+        openBoard(state.boardName, false);
+      } else if (state.view === 'inbox') {
+        openInbox(false);
+      } else if (state.view === 'members') {
+        openMemberList(false);
+      } else if (state.view === 'profile') {
+        toggleProfileEditor(false);
+      } else {
+        showIndex(false);
+      }
     }
 
     async function loadProfiles() {
@@ -929,7 +985,7 @@
       }
 
       if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) {
-        openThread(currentThread.id, currentThreadPage);
+        openThread(currentThread.id, currentThreadPage, false);
       }
     }
 
@@ -956,7 +1012,7 @@
       return uploadedUrls;
     }
 
-    function toggleProfileEditor() {
+    function toggleProfileEditor(pushHistory = true) {
       ['viewIndex', 'viewBoard', 'viewThread', 'viewInbox', 'viewSearch', 'viewMemberList', 'viewAuthPortal'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
@@ -965,6 +1021,10 @@
         <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Index</a> &raquo; <b>Edit Profile</b>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
+
+      if (pushHistory) {
+        history.pushState({ view: 'profile' }, '', '?view=profile');
+      }
 
       if (currentUser) {
         const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
@@ -1219,7 +1279,7 @@
       if (error) {
         alert('Error updating lock status: ' + error.message);
       } else {
-        openThread(threadId, currentThreadPage);
+        openThread(currentThread.id, currentThreadPage);
       }
     }
 
@@ -1248,7 +1308,7 @@
     }
 
     // Member Directory
-    async function openMemberList() {
+    async function openMemberList(pushHistory = true) {
       ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewSearch', 'viewInbox', 'viewAuthPortal'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
@@ -1257,6 +1317,10 @@
         <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>Member Directory</b>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
+
+      if (pushHistory) {
+        history.pushState({ view: 'members' }, '', '?view=members');
+      }
 
       const { data: profiles } = await db.from('profiles').select('*');
       const tbody = document.getElementById('memberListBody');
@@ -1314,7 +1378,7 @@
       document.getElementById('inboxBtn').textContent = unread > 0 ? `Inbox (${unread} New)` : `Inbox (0)`;
     }
 
-    async function openInbox() {
+    async function openInbox(pushHistory = true) {
       ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewSearch', 'viewMemberList', 'viewAuthPortal'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
       });
@@ -1327,6 +1391,10 @@
         <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>Private Messages</b>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
+
+      if (pushHistory) {
+        history.pushState({ view: 'inbox' }, '', '?view=inbox');
+      }
 
       if (!currentUser) return;
       const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
@@ -1602,8 +1670,6 @@
 
       if (!user) {
         showAuthPortal();
-      } else {
-        showIndex();
       }
     }
 
@@ -1639,7 +1705,7 @@
       }
     }
 
-    async function showIndex() {
+    async function showIndex(pushHistory = true) {
       if (!currentUser) {
         showAuthPortal();
         return;
@@ -1651,6 +1717,10 @@
         <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Forum Index</a>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
+
+      if (pushHistory) {
+        history.pushState({ view: 'index' }, '', window.location.pathname);
+      }
 
       const { data: threads } = await db.from('messages').select('id, category, username, created_at, title');
       const { data: replies } = await db.from('replies').select('id, thread_id, username, created_at');
@@ -1695,7 +1765,7 @@
       updateForumStatsUI(Array.from(onlineUsernames), onlineGuestsCount);
     }
 
-    async function openBoard(boardName) {
+    async function openBoard(boardName, pushHistory = true) {
       if (!currentUser) { showAuthPortal(); return; }
       currentBoard = boardName;
       currentThread = null;
@@ -1705,6 +1775,10 @@
         <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Forum Index</a> &raquo; <b>${escapeHtml(boardName)}</b>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
+
+      if (pushHistory) {
+        history.pushState({ view: 'board', boardName: boardName }, '', `?board=${encodeURIComponent(boardName)}`);
+      }
 
       const { data: threads, error } = await db
         .from('messages')
@@ -1824,7 +1898,7 @@
       return { rankTitle: 'Newbie', stars: '⭐' };
     }
 
-    async function openThread(threadId, page = 1) {
+    async function openThread(threadId, page = 1, pushHistory = true) {
       if (!currentUser) { showAuthPortal(); return; }
       switchView('viewThread');
       await loadProfiles();
@@ -1843,6 +1917,10 @@
         <b>${escapeHtml(thread.title || 'Thread')}</b>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
+
+      if (pushHistory) {
+        history.pushState({ view: 'thread', threadId: threadId, page: page }, '', `?thread=${threadId}&page=${page}`);
+      }
 
       // Handle locked notice and reply form visibility
       const lockedNotice = document.getElementById('threadLockedNotice');
