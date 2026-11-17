@@ -3,158 +3,315 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cantaloupe Chat</title>
+  <title>Cantaloupe Chat Forums</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    :root {
-      --bg: #fff9f2;
-      --card: #ffffff;
-      --primary: #ff8c42;
-      --primary-dark: #e06d24;
-      --text: #2d2a26;
-      --muted: #7a7267;
-      --border: #eedcc8;
-    }
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      display: flex;
-      justify-content: center;
-      padding: 16px;
+      padding: 10px;
+      background-color: #d9dee4;
+      color: #111111;
+      font-family: Verdana, Tahoma, Arial, sans-serif;
+      font-size: 12px;
     }
-    .container {
-      width: 100%;
-      max-width: 650px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+    a { color: #1b4d89; text-decoration: none; font-weight: bold; }
+    a:hover { text-decoration: underline; color: #cc5500; }
+
+    .forum-wrapper {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid #6b7b8c;
     }
-    header {
+
+    /* 2005 Classic Banner */
+    .top-banner {
+      background: linear-gradient(180deg, #2b4c7e 0%, #1a3154 100%);
+      color: #ffffff;
+      padding: 14px 16px;
+      border-bottom: 3px solid #e67e22;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 12px;
-      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
     }
-    h1 { margin: 0; font-size: 1.4rem; color: var(--primary-dark); }
-    button {
-      background: var(--primary);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-weight: 600;
+    .site-title {
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      color: #ffffff;
+      text-shadow: 1px 1px 2px #000000;
       cursor: pointer;
-      font-size: 0.9rem;
     }
-    button:hover { background: var(--primary-dark); }
-    button.secondary { background: #eee6dc; color: var(--text); }
-    input, textarea, select {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 1rem;
-      margin-bottom: 10px;
-      background: #fff;
+    .site-subtitle {
+      font-size: 10px;
+      color: #cfdbe8;
+      margin-top: 2px;
     }
-    .auth-box {
-      background: #fff4e8;
-      padding: 14px;
-      border-radius: 12px;
-      margin-bottom: 16px;
-    }
-    .board-nav {
-      margin-bottom: 16px;
-    }
-    .board-nav label { font-size: 0.85rem; font-weight: 700; color: var(--muted); display: block; margin-bottom: 4px; }
-    .messages {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      max-height: 50vh;
-      overflow-y: auto;
-      margin-bottom: 16px;
-      padding-right: 4px;
-    }
-    .msg {
-      background: #faf6f0;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 10px 14px;
-    }
-    .msg-header {
+
+    /* Sub-header / User Bar */
+    .user-bar {
+      background: #eef2f6;
+      border-bottom: 1px solid #9aa8b8;
+      padding: 8px 12px;
       display: flex;
       justify-content: space-between;
-      font-size: 0.8rem;
-      color: var(--muted);
-      margin-bottom: 4px;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 11px;
     }
-    .msg-user { font-weight: 700; color: var(--primary-dark); }
-    .msg-tag { background: #fee8d6; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: var(--primary-dark); margin-bottom: 6px; display: inline-block; font-weight: 600;}
-    .msg-body { white-space: pre-wrap; word-break: break-word; }
-    .hidden { display: none; }
-    .status { font-size: 0.85rem; color: #c0392b; margin-top: 6px; }
+    .breadcrumb {
+      background: #f7f9fb;
+      border-bottom: 1px solid #b8c4d0;
+      padding: 7px 12px;
+      font-size: 11px;
+    }
+
+    /* Classic Forum Tables */
+    table.forum-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table.forum-table th {
+      background: linear-gradient(180deg, #4b6c9e 0%, #314b73 100%);
+      color: #ffffff;
+      text-align: left;
+      padding: 7px 10px;
+      font-size: 11px;
+      border: 1px solid #2b4163;
+    }
+    table.forum-table td {
+      padding: 9px 10px;
+      border: 1px solid #c5cfd9;
+      vertical-align: middle;
+    }
+    tr.row-even td { background-color: #f4f7fa; }
+    tr.row-odd td { background-color: #ffffff; }
+    tr.row-even:hover td, tr.row-odd:hover td { background-color: #e9eff5; }
+
+    .board-desc {
+      font-size: 10px;
+      color: #555555;
+      margin-top: 3px;
+    }
+    .center-col { text-align: center; width: 70px; }
+    .last-post-col { width: 190px; font-size: 10px; color: #333333; }
+
+    /* Classic Post Layout (2-Column User Info + Message) */
+    .post-box {
+      border: 1px solid #8c9ba8;
+      margin: 10px;
+      background: #ffffff;
+    }
+    .post-header {
+      background: #cfd9e4;
+      border-bottom: 1px solid #8c9ba8;
+      padding: 5px 10px;
+      font-size: 10px;
+      color: #222222;
+      display: flex;
+      justify-content: space-between;
+    }
+    .post-body-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .post-author-cell {
+      width: 150px;
+      background: #eef2f6;
+      border-right: 1px solid #c5cfd9;
+      padding: 10px;
+      vertical-align: top;
+      font-size: 11px;
+    }
+    .author-name {
+      font-weight: bold;
+      font-size: 12px;
+      color: #1b4d89;
+      margin-bottom: 4px;
+      word-break: break-word;
+    }
+    .author-rank {
+      font-size: 10px;
+      color: #555555;
+    }
+    .post-content-cell {
+      padding: 12px;
+      vertical-align: top;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Controls & Forms */
+    input, textarea {
+      font-family: Verdana, Tahoma, Arial, sans-serif;
+      font-size: 11px;
+      padding: 5px;
+      border: 1px solid #7f9db9;
+      background: #ffffff;
+    }
+    button {
+      font-family: Verdana, Tahoma, Arial, sans-serif;
+      font-size: 11px;
+      font-weight: bold;
+      background: #e1e7ee;
+      border: 1px solid #6b7b8c;
+      color: #111111;
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+    button:hover { background: #cfd9e4; }
+    button.primary-btn {
+      background: #2b4c7e;
+      color: #ffffff;
+      border-color: #1a3154;
+    }
+    button.primary-btn:hover { background: #1a3154; }
+
+    .form-box {
+      margin: 10px;
+      border: 1px solid #8c9ba8;
+      background: #f4f7fa;
+    }
+    .form-box-header {
+      background: #314b73;
+      color: #ffffff;
+      padding: 6px 10px;
+      font-weight: bold;
+      font-size: 11px;
+    }
+    .form-box-body { padding: 10px; }
+    .form-box-body input, .form-box-body textarea {
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    .hidden { display: none !important; }
+    .status-msg { color: #b00020; font-weight: bold; font-size: 11px; margin-top: 5px; }
+    .footer-bar {
+      background: #eef2f6;
+      border-top: 1px solid #9aa8b8;
+      padding: 8px;
+      text-align: center;
+      font-size: 10px;
+      color: #555555;
+    }
+
+    @media (max-width: 600px) {
+      .post-author-cell { width: 105px; padding: 8px; }
+      .last-post-col { display: none; }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>🍈 Cantaloupe Chat</h1>
-      <button id="logoutBtn" class="secondary hidden" onclick="signOut()">Log out</button>
-    </header>
-
-    <!-- Auth Section -->
-    <div id="authSection" class="auth-box">
-      <div style="font-weight: 600; margin-bottom: 8px;">Sign in or create an account to post</div>
-      <input type="text" id="usernameInput" placeholder="Username (for new accounts)" />
-      <input type="email" id="emailInput" placeholder="Email address" />
-      <input type="password" id="passwordInput" placeholder="Password (min 6 characters)" />
-      <div style="display: flex; gap: 8px;">
-        <button onclick="signIn()" style="flex:1;">Log In</button>
-        <button onclick="signUp()" class="secondary" style="flex:1;">Sign Up</button>
+  <div class="forum-wrapper">
+    <!-- Top Header -->
+    <div class="top-banner">
+      <div onclick="showIndex()">
+        <div class="site-title">CANTALOUPE CHAT</div>
+        <div class="site-subtitle">Official Community Message Boards &bull; Est. 2026</div>
       </div>
-      <div id="authStatus" class="status"></div>
+      <div>
+        <button onclick="showIndex()">Board Index</button>
+      </div>
     </div>
 
-    <!-- Category Filter Navigation -->
-    <div class="board-nav">
-      <label for="categoryFilter">Select Board:</label>
-      <select id="categoryFilter" onchange="loadMessages()">
-        <option value="All">🌐 All Boards (Combined Feed)</option>
-        <option value="Misc/Anything">Misc/Anything</option>
-        <option value="Movies/Music/Entertainment/Etc.">Movies/Music/Entertainment/Etc.</option>
-        <option value="Personal/Dump">Personal/Dump</option>
-        <option value="Pro Wrestling">Pro Wrestling</option>
-        <option value="Technology/Social Media/AI">Technology/Social Media/AI</option>
-        <option value="World Events/News/Politics">World Events/News/Politics</option>
-      </select>
+    <!-- User / Auth Bar -->
+    <div class="user-bar">
+      <div id="welcomeText">Welcome, <b>Guest</b>! Please log in or register to post threads and replies.</div>
+      <div id="loggedOutControls" style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
+        <input type="text" id="usernameInput" placeholder="Username (Register)" style="width:120px;" />
+        <input type="email" id="emailInput" placeholder="Email" style="width:130px;" />
+        <input type="password" id="passwordInput" placeholder="Password" style="width:100px;" />
+        <button onclick="signIn()">Log In</button>
+        <button onclick="signUp()">Register</button>
+      </div>
+      <div id="loggedInControls" class="hidden">
+        <button onclick="signOut()">Log Out</button>
+      </div>
+    </div>
+    <div id="authStatus" class="status-msg" style="padding: 0 12px;"></div>
+
+    <!-- Breadcrumb Bar -->
+    <div class="breadcrumb" id="breadcrumbNav">
+      <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a>
     </div>
 
-    <!-- Message Feed -->
-    <div id="messagesList" class="messages">
-      <div style="color: var(--muted); text-align: center;">Loading messages...</div>
+    <!-- VIEW 1: FORUM INDEX (All Boards Alphabetical) -->
+    <div id="viewIndex">
+      <table class="forum-table">
+        <thead>
+          <tr>
+            <th>Forum / Category</th>
+            <th class="center-col">Threads</th>
+            <th class="center-col">Replies</th>
+            <th class="last-post-col">Last Post</th>
+          </tr>
+        </thead>
+        <tbody id="boardIndexBody">
+          <tr><td colspan="4" style="text-align:center; padding:16px;">Loading boards...</td></tr>
+        </tbody>
+      </table>
     </div>
 
-    <!-- Post Form (Logged-in users only) -->
-    <div id="postSection" class="hidden">
-      <label for="postCategory" style="font-size: 0.85rem; font-weight: 700; color: var(--muted);">Post to Board:</label>
-      <select id="postCategory">
-        <option value="Misc/Anything">Misc/Anything</option>
-        <option value="Movies/Music/Entertainment/Etc.">Movies/Music/Entertainment/Etc.</option>
-        <option value="Personal/Dump">Personal/Dump</option>
-        <option value="Pro Wrestling">Pro Wrestling</option>
-        <option value="Technology/Social Media/AI">Technology/Social Media/AI</option>
-        <option value="World Events/News/Politics">World Events/News/Politics</option>
-      </select>
-      <textarea id="messageInput" rows="2" placeholder="Write a message to the board..."></textarea>
-      <button onclick="postMessage()" style="width: 100%;">Post Message</button>
-      <div id="postStatus" class="status"></div>
+    <!-- VIEW 2: THREAD LIST FOR SELECTED BOARD -->
+    <div id="viewBoard" class="hidden">
+      <div style="padding: 8px 10px; display:flex; justify-content:space-between; align-items:center; background:#f7f9fb; border-bottom:1px solid #c5cfd9;">
+        <strong id="currentBoardTitle" style="font-size:13px;">Board Name</strong>
+        <button id="newThreadBtn" class="primary-btn hidden" onclick="toggleNewThreadForm()">+ New Thread</button>
+      </div>
+
+      <!-- New Thread Form -->
+      <div id="newThreadForm" class="form-box hidden">
+        <div class="form-box-header">Post New Thread</div>
+        <div class="form-box-body">
+          <input type="text" id="threadTitleInput" placeholder="Thread Subject / Title" maxlength="120" />
+          <textarea id="threadBodyInput" rows="5" placeholder="Enter your message here..."></textarea>
+          <button class="primary-btn" onclick="createThread()">Submit New Thread</button>
+          <button onclick="toggleNewThreadForm()">Cancel</button>
+          <div id="threadStatus" class="status-msg"></div>
+        </div>
+      </div>
+
+      <table class="forum-table">
+        <thead>
+          <tr>
+            <th>Thread Title</th>
+            <th style="width:130px;">Author</th>
+            <th class="center-col">Replies</th>
+            <th class="last-post-col">Posted</th>
+          </tr>
+        </thead>
+        <tbody id="threadListBody"></tbody>
+      </table>
+    </div>
+
+    <!-- VIEW 3: SINGLE THREAD & ALL REPLIES -->
+    <div id="viewThread" class="hidden">
+      <div style="padding: 8px 10px; background:#f7f9fb; border-bottom:1px solid #c5cfd9; display:flex; justify-content:space-between; align-items:center;">
+        <strong id="singleThreadTitle" style="font-size:13px;">Thread Title</strong>
+        <button onclick="openBoard(currentBoard)">&laquo; Back to Board</button>
+      </div>
+
+      <div id="threadPostsContainer"></div>
+
+      <!-- Quick Reply Box -->
+      <div id="replyFormBox" class="form-box hidden">
+        <div class="form-box-header">Post a Reply</div>
+        <div class="form-box-body">
+          <textarea id="replyBodyInput" rows="4" placeholder="Write your reply to this thread..."></textarea>
+          <button class="primary-btn" onclick="postReply()">Post Reply</button>
+          <div id="replyStatus" class="status-msg"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bar">
+      Powered by Cantaloupe Chat &bull; Classic Forum Layout &bull; All times local
     </div>
   </div>
 
@@ -163,7 +320,19 @@
     const SUPABASE_KEY = 'sb_publishable__2S12w5d3RXrN6EeKZbQxQ_Y87phSlJ';
     const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // Strictly Alphabetical Boards
+    const BOARDS = [
+      { name: 'Misc/Anything', desc: 'General off-topic chatter, random thoughts, and anything else.' },
+      { name: 'Movies/Music/Entertainment/Etc.', desc: 'Film, TV shows, albums, gaming, and pop culture discussion.' },
+      { name: 'Personal/Dump', desc: 'Rants, daily logs, personal stories, and brain dumps.' },
+      { name: 'Pro Wrestling', desc: 'WWE, AEW, NJPW, indies, rumors, and classic wrestling talk.' },
+      { name: 'Technology/Social Media/AI', desc: 'Gadgets, internet culture, apps, coding, and artificial intelligence.' },
+      { name: 'World Events/News/Politics', desc: 'Breaking headlines, current affairs, history, and political debate.' }
+    ];
+
     let currentUser = null;
+    let currentBoard = null;
+    let currentThread = null;
 
     async function init() {
       const { data: { session } } = await db.auth.getSession();
@@ -173,20 +342,37 @@
         updateAuthState(session?.user || null);
       });
 
-      await loadMessages();
+      await showIndex();
 
-      db.channel('public:messages')
+      // Real-time updates for new threads and replies
+      db.channel('forum-realtime')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
-          loadMessages();
+          if (!document.getElementById('viewIndex').classList.contains('hidden')) showIndex();
+          if (!document.getElementById('viewBoard').classList.contains('hidden') && currentBoard) openBoard(currentBoard);
+        })
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'replies' }, (payload) => {
+          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread && payload.new.thread_id === currentThread.id) {
+            openThread(currentThread.id);
+          }
+          if (!document.getElementById('viewIndex').classList.contains('hidden')) showIndex();
         })
         .subscribe();
     }
 
     function updateAuthState(user) {
       currentUser = user;
-      document.getElementById('authSection').classList.toggle('hidden', !!user);
-      document.getElementById('postSection').classList.toggle('hidden', !user);
-      document.getElementById('logoutBtn').classList.toggle('hidden', !user);
+      const welcome = document.getElementById('welcomeText');
+      if (user) {
+        const name = user.user_metadata?.username || user.email.split('@')[0];
+        welcome.innerHTML = `Logged in as: <b>${escapeHtml(name)}</b>`;
+      } else {
+        welcome.innerHTML = `Welcome, <b>Guest</b>! Please log in or register to post threads and replies.`;
+      }
+      document.getElementById('loggedOutControls').classList.toggle('hidden', !!user);
+      document.getElementById('loggedInControls').classList.toggle('hidden', !user);
+      document.getElementById('newThreadBtn').classList.toggle('hidden', !user);
+      document.getElementById('replyFormBox').classList.toggle('hidden', !user);
+      if (!user) document.getElementById('newThreadForm').classList.add('hidden');
     }
 
     async function signUp() {
@@ -194,7 +380,7 @@
       const password = document.getElementById('passwordInput').value;
       const username = document.getElementById('usernameInput').value.trim() || email.split('@')[0];
       const status = document.getElementById('authStatus');
-      status.textContent = 'Creating account...';
+      status.textContent = 'Registering...';
 
       const { data, error } = await db.auth.signUp({
         email,
@@ -205,8 +391,8 @@
       if (error) {
         status.textContent = error.message;
       } else {
-        status.style.color = '#2e7d32';
-        status.textContent = data.session ? 'Signed in!' : 'Check your email to confirm your account.';
+        status.style.color = '#1b5e20';
+        status.textContent = data.session ? 'Registered and logged in!' : 'Check your email to confirm your account.';
       }
     }
 
@@ -214,87 +400,238 @@
       const email = document.getElementById('emailInput').value.trim();
       const password = document.getElementById('passwordInput').value;
       const status = document.getElementById('authStatus');
-      status.style.color = '#c0392b';
+      status.style.color = '#b00020';
       status.textContent = 'Logging in...';
 
       const { error } = await db.auth.signInWithPassword({ email, password });
-      if (error) {
-        status.textContent = error.message;
-      } else {
-        status.textContent = '';
-      }
+      status.textContent = error ? error.message : '';
     }
 
     async function signOut() {
       await db.auth.signOut();
     }
 
-    async function loadMessages() {
-      const list = document.getElementById('messagesList');
-      const selectedCategory = document.getElementById('categoryFilter').value;
-
-      let query = db.from('messages').select('*').order('created_at', { ascending: true }).limit(100);
-
-      if (selectedCategory !== 'All') {
-        query = query.eq('category', selectedCategory);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        list.innerHTML = `<div style="color:#c0392b;">Error loading messages: ${error.message}</div>`;
-        return;
-      }
-
-      if (!data.length) {
-        list.innerHTML = `<div style="color:var(--muted); text-align:center;">No messages in this board yet. Be the first!</div>`;
-        return;
-      }
-
-      list.innerHTML = data.map(m => {
-        const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        return `
-          <div class="msg">
-            <div class="msg-header">
-              <span class="msg-user">${escapeHtml(m.username || 'Anonymous')}</span>
-              <span>${time}</span>
-            </div>
-            <div class="msg-tag">📁 ${escapeHtml(m.category || 'Misc/Anything')}</div>
-            <div class="msg-body">${escapeHtml(m.message)}</div>
-          </div>
-        `;
-      }).join('');
-      list.scrollTop = list.scrollHeight;
+    function switchView(viewId) {
+      ['viewIndex', 'viewBoard', 'viewThread'].forEach(id => {
+        document.getElementById(id).classList.toggle('hidden', id !== viewId);
+      });
     }
 
-    async function postMessage() {
-      if (!currentUser) return;
-      const input = document.getElementById('messageInput');
-      const categorySelect = document.getElementById('postCategory');
-      const status = document.getElementById('postStatus');
+    // VIEW 1: BOARD INDEX
+    async function showIndex() {
+      currentBoard = null;
+      currentThread = null;
+      switchView('viewIndex');
+      document.getElementById('breadcrumbNav').innerHTML = `<a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a>`;
+
+      const { data: threads } = await db.from('messages').select('id, category, username, created_at, title');
+      const { data: replies } = await db.from('replies').select('id, thread_id, username, created_at');
+
+      const allThreads = threads || [];
+      const allReplies = replies || [];
+
+      const tbody = document.getElementById('boardIndexBody');
+      tbody.innerHTML = BOARDS.map((b, idx) => {
+        const boardThreads = allThreads.filter(t => t.category === b.name);
+        const threadIds = new Set(boardThreads.map(t => t.id));
+        const boardReplies = allReplies.filter(r => threadIds.has(r.thread_id));
+
+        // Find latest activity
+        let lastText = 'No posts yet';
+        const combined = [
+          ...boardThreads.map(t => ({ user: t.username, time: t.created_at, title: t.title })),
+          ...boardReplies.map(r => {
+            const parent = boardThreads.find(t => t.id === r.thread_id);
+            return { user: r.username, time: r.created_at, title: parent ? parent.title : 'Thread' };
+          })
+        ].sort((a, b) => new Date(b.time) - new Date(a.time));
+
+        if (combined.length > 0) {
+          const latest = combined[0];
+          lastText = `<b>${escapeHtml(latest.title || 'Thread')}</b><br/>by ${escapeHtml(latest.user || 'Member')}<br/>${formatDate(latest.time)}`;
+        }
+
+        const rowClass = idx % 2 === 0 ? 'row-odd' : 'row-even';
+        return `
+          <tr class="${rowClass}">
+            <td>
+              <a href="javascript:void(0)" onclick="openBoard('${escapeHtml(b.name)}')" style="font-size:13px;">${escapeHtml(b.name)}</a>
+              <div class="board-desc">${escapeHtml(b.desc)}</div>
+            </td>
+            <td class="center-col">${boardThreads.length}</td>
+            <td class="center-col">${boardReplies.length}</td>
+            <td class="last-post-col">${lastText}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // VIEW 2: THREAD LIST IN BOARD
+    async function openBoard(boardName) {
+      currentBoard = boardName;
+      currentThread = null;
+      switchView('viewBoard');
+      document.getElementById('currentBoardTitle').textContent = boardName;
+      document.getElementById('breadcrumbNav').innerHTML = `
+        <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; <b>${escapeHtml(boardName)}</b>
+      `;
+
+      const { data: threads, error } = await db
+        .from('messages')
+        .select('*')
+        .eq('category', boardName)
+        .order('created_at', { ascending: false });
+
+      const { data: replies } = await db.from('replies').select('id, thread_id');
+      const allReplies = replies || [];
+
+      const tbody = document.getElementById('threadListBody');
+      if (error) {
+        tbody.innerHTML = `<tr><td colspan="4" style="color:red;">Error: ${escapeHtml(error.message)}</td></tr>`;
+        return;
+      }
+
+      if (!threads || threads.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:18px; color:#555;">No threads have been posted in this board yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = threads.map((t, idx) => {
+        const replyCount = allReplies.filter(r => r.thread_id === t.id).length;
+        const rowClass = idx % 2 === 0 ? 'row-odd' : 'row-even';
+        return `
+          <tr class="${rowClass}">
+            <td><a href="javascript:void(0)" onclick="openThread(${t.id})">${escapeHtml(t.title || 'Untitled Thread')}</a></td>
+            <td>${escapeHtml(t.username || 'Member')}</td>
+            <td class="center-col">${replyCount}</td>
+            <td class="last-post-col">${formatDate(t.created_at)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function toggleNewThreadForm() {
+      document.getElementById('newThreadForm').classList.toggle('hidden');
+    }
+
+    async function createThread() {
+      if (!currentUser || !currentBoard) return;
+      const titleInput = document.getElementById('threadTitleInput');
+      const bodyInput = document.getElementById('threadBodyInput');
+      const status = document.getElementById('threadStatus');
+
+      const title = titleInput.value.trim();
+      const body = bodyInput.value.trim();
+      if (!title || !body) {
+        status.textContent = 'Please enter both a thread title and message.';
+        return;
+      }
+
+      const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      status.textContent = 'Posting thread...';
+
+      const { data, error } = await db.from('messages').insert({
+        user_id: currentUser.id,
+        username: username,
+        category: currentBoard,
+        title: title,
+        message: body
+      }).select().single();
+
+      if (error) {
+        status.textContent = error.message;
+      } else {
+        titleInput.value = '';
+        bodyInput.value = '';
+        status.textContent = '';
+        document.getElementById('newThreadForm').classList.add('hidden');
+        openThread(data.id);
+      }
+    }
+
+    // VIEW 3: SINGLE THREAD & REPLIES
+    async function openThread(threadId) {
+      switchView('viewThread');
+
+      const { data: thread, error } = await db.from('messages').select('*').eq('id', threadId).single();
+      if (error || !thread) return;
+
+      currentThread = thread;
+      currentBoard = thread.category;
+
+      document.getElementById('singleThreadTitle').textContent = thread.title || 'Untitled Thread';
+      document.getElementById('breadcrumbNav').innerHTML = `
+        <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; 
+        <a href="javascript:void(0)" onclick="openBoard('${escapeHtml(thread.category)}')">${escapeHtml(thread.category)}</a> &raquo; 
+        <b>${escapeHtml(thread.title || 'Thread')}</b>
+      `;
+
+      const { data: replies } = await db
+        .from('replies')
+        .select('*')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: true });
+
+      const allPosts = [
+        { ...thread, isOP: true },
+        ...(replies || []).map(r => ({ ...r, isOP: false }))
+      ];
+
+      const container = document.getElementById('threadPostsContainer');
+      container.innerHTML = allPosts.map((p, index) => `
+        <div class="post-box">
+          <div class="post-header">
+            <span>Posted: ${formatDate(p.created_at)}</span>
+            <span><b>#${index + 1}</b> ${p.isOP ? '(Thread Starter)' : ''}</span>
+          </div>
+          <table class="post-body-table">
+            <tr>
+              <td class="post-author-cell">
+                <div class="author-name">${escapeHtml(p.username || 'Member')}</div>
+                <div class="author-rank">Forum Member</div>
+              </td>
+              <td class="post-content-cell">${escapeHtml(p.message)}</td>
+            </tr>
+          </table>
+        </div>
+      `).join('');
+    }
+
+    async function postReply() {
+      if (!currentUser || !currentThread) return;
+      const input = document.getElementById('replyBodyInput');
+      const status = document.getElementById('replyStatus');
       const text = input.value.trim();
       if (!text) return;
 
       const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
-      status.textContent = '';
+      status.textContent = 'Posting reply...';
 
-      const { error } = await db.from('messages').insert({
+      const { error } = await db.from('replies').insert({
+        thread_id: currentThread.id,
         user_id: currentUser.id,
         username: username,
-        message: text,
-        category: categorySelect.value
+        message: text
       });
 
       if (error) {
         status.textContent = error.message;
       } else {
         input.value = '';
-        await loadMessages();
+        status.textContent = '';
+        await openThread(currentThread.id);
       }
     }
 
+    function formatDate(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+             d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
     function escapeHtml(str) {
-      return str.replace(/[&<>"']/g, tag => ({
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, tag => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
       }[tag]));
     }
