@@ -55,6 +55,10 @@
       font-size: 24px;
       border: 2px solid #fff;
       box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      transition: transform 0.1s ease;
+    }
+    .cantaloupe-logo:hover {
+      transform: scale(1.08);
     }
     .site-title {
       font-size: 20px;
@@ -235,7 +239,8 @@
       margin-bottom: 2px;
       word-break: break-word;
     }
-    .author-rank { font-size: 10px; color: #7a7267; margin-bottom: 6px; }
+    .author-rank { font-size: 10px; color: #7a7267; margin-bottom: 2px; }
+    .author-stars { font-size: 11px; color: #f39c12; margin-bottom: 6px; letter-spacing: 1px; }
     .admin-badge {
       display: inline-block;
       background: #c0392b;
@@ -398,9 +403,9 @@
 </head>
 <body>
   <div class="forum-wrapper">
-    <!-- Top Header with Cantaloupe Image/Logo & Search -->
+    <!-- Top Header with Cantaloupe Home Button & Search -->
     <div class="top-banner">
-      <div class="banner-brand" onclick="showIndex()">
+      <div class="banner-brand" onclick="showIndex()" title="Return to Cantaloupe Chat Home">
         <div class="cantaloupe-logo">🍈</div>
         <div>
           <div class="site-title">CANTALOUPE CHAT</div>
@@ -410,7 +415,7 @@
       <div class="banner-search">
         <input type="text" id="searchInput" placeholder="Search forums..." style="width:130px; height:24px;" />
         <button onclick="performSearch()">Search</button>
-        <button onclick="showIndex()">Board Index</button>
+        <button onclick="showIndex()">Home</button>
       </div>
     </div>
 
@@ -462,7 +467,7 @@
         <div class="form-box-body">
           <div style="font-size:10px; color:#7a7267; margin-bottom:6px;" id="pmViewMeta">From: User</div>
           <div id="pmViewContent" style="white-space:pre-wrap; line-height:1.45; margin-bottom:10px;">Body</div>
-          <button onclick="closePMMessage()">Back to Inbox</button>
+          <button onclick="openInbox()">Back to Inbox</button>
         </div>
       </div>
 
@@ -1254,6 +1259,14 @@
       }
     }
 
+    function getUserRankAndStars(postCount) {
+      if (postCount >= 500) return { rank: 'Forum Veteran', stars: '⭐⭐⭐⭐⭐' };
+      if (postCount >= 200) return { rank: 'Senior Member', stars: '⭐⭐⭐⭐' };
+      if (postCount >= 50) return { rank: 'Full Member', stars: '⭐⭐⭐' };
+      if (postCount >= 10) return { rank: 'Junior Member', stars: '⭐⭐' };
+      return { rank: 'Newbie', stars: '⭐' };
+    }
+
     async function openThread(threadId, page = 1) {
       switchView('viewThread');
       await loadProfiles();
@@ -1315,6 +1328,8 @@
         const bio = profile.bio;
         const signature = profile.signature;
 
+        const rankData = getUserRankAndStars(postCount);
+
         const postVotes = (allVotes || []).filter(v => v.target_id === p.id && v.target_type === p.targetType);
         const score = postVotes.reduce((acc, v) => acc + v.vote_type, 0);
         const userVote = currentUser ? postVotes.find(v => v.user_id === currentUser.id)?.vote_type : 0;
@@ -1344,7 +1359,7 @@
                       : `<span class="status-dot status-offline"></span><span style="color:#7a7267;">Offline</span>`
                     }
                   </span>
-                  ${isAdmin ? '<div class="admin-badge">Site Admin</div>' : '<div class="author-rank">Forum Member</div>'}
+                  ${isAdmin ? '<div class="admin-badge">Site Admin</div>' : `<div class="author-rank">${rankData.rank}</div><div class="author-stars">${rankData.stars}</div>`}
                   ${avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(uname)}'s avatar" class="author-avatar" />` : ''}
                   ${bio ? `<div class="author-bio">"${escapeHtml(bio)}"</div>` : ''}
                   <div class="author-stats">
