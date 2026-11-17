@@ -1304,6 +1304,8 @@
 
     async function signOut() {
       await db.auth.signOut();
+      currentUser = null;
+      updateAuthState(null);
       showIndex();
     }
 
