@@ -197,7 +197,7 @@
       border-collapse: collapse;
     }
     .post-author-cell {
-      width: 150px;
+      width: 160px;
       background: #fff9f2;
       border-right: 1px solid #f3dcd1;
       padding: 10px;
@@ -211,8 +211,18 @@
       border: 1px solid #d3a081;
       background: #ffffff;
       padding: 2px;
-      margin: 6px 0;
+      margin: 6px 0 4px 0;
       display: block;
+    }
+    .author-bio {
+      font-size: 9px;
+      color: #555555;
+      font-style: italic;
+      margin-bottom: 8px;
+      word-break: break-word;
+      line-height: 1.3;
+      border-bottom: 1px dashed #e8ccc0;
+      padding-bottom: 6px;
     }
     .author-name {
       font-weight: bold;
@@ -236,9 +246,7 @@
     .author-stats {
       font-size: 10px;
       color: #555555;
-      border-top: 1px dashed #e8ccc0;
-      padding-top: 6px;
-      margin-top: 6px;
+      padding-top: 4px;
     }
     .post-content-cell {
       padding: 12px;
@@ -354,8 +362,7 @@
         <button onclick="signUp()">Register</button>
       </div>
       <div id="loggedInControls" class="hidden" style="display:flex; gap:6px; align-items:center;">
-        <input type="file" id="avatarFileInput" accept="image/*" class="hidden" onchange="uploadAvatar(event)" />
-        <button onclick="document.getElementById('avatarFileInput').click()">Change Avatar</button>
+        <button class="primary-btn" onclick="toggleProfileEditor()">Edit Profile</button>
         <button onclick="signOut()">Log Out</button>
       </div>
     </div>
@@ -364,6 +371,28 @@
     <!-- Breadcrumb Bar -->
     <div class="breadcrumb" id="breadcrumbNav">
       <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a>
+    </div>
+
+    <!-- PROFILE EDITOR VIEW -->
+    <div id="viewProfileEditor" class="form-box hidden">
+      <div class="form-box-header">Edit Your Profile</div>
+      <div class="form-box-body">
+        <div style="margin-bottom: 10px;">
+          <label><b>Current Avatar:</b></label><br/>
+          <img id="editProfileAvatarPreview" src="" alt="Avatar preview" style="width:80px; height:80px; object-fit:cover; border:1px solid #d3a081; margin-top:4px;" />
+        </div>
+        <div class="file-upload-row">
+          <label><b>Upload New Avatar:</b></label>
+          <input type="file" id="editAvatarFileInput" accept="image/*" />
+        </div>
+        <div style="margin-top: 8px;">
+          <label for="editBioInput"><b>Profile Message / Status (Under Pic):</b></label>
+          <input type="text" id="editBioInput" placeholder="e.g. Cantaloupe enthusiast & wrestling archivist" maxlength="100" />
+        </div>
+        <button class="primary-btn" id="saveProfileBtn" onclick="saveProfileChanges()">Save Profile</button>
+        <button onclick="showIndex()">Cancel</button>
+        <div id="profileEditStatus" class="status-msg"></div>
+      </div>
     </div>
 
     <!-- VIEW 1: FORUM INDEX -->
@@ -475,7 +504,7 @@
     let currentThread = null;
     let presenceChannel = null;
     let onlineUsernames = new Set();
-    let userAvatars = {};
+    let userProfiles = {}; // Stores { avatar_url, bio }
     const sessionKey = 'guest-' + Math.random().toString(36).substring(2, 10);
 
     async function init() {
@@ -487,7 +516,7 @@
         trackUserPresence();
       });
 
-      await loadAvatars();
+      await loadProfiles();
       setupPresence();
       await showIndex();
 
@@ -505,15 +534,24 @@
           if (!document.getElementById('viewBoard').classList.contains('hidden') && currentBoard) openBoard(currentBoard);
           if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id);
         })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async () => {
+          await loadProfiles();
+          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id);
+        })
         .subscribe();
     }
 
-    async function loadAvatars() {
-      const { data } = await db.from('profiles').select('username, avatar_url');
+    async function loadProfiles() {
+      const { data } = await db.from('profiles').select('username, avatar_url, bio');
       if (data) {
-        userAvatars = {};
+        userProfiles = {};
         data.forEach(p => {
-          if (p.username && p.avatar_url) userAvatars[p.username.toLowerCase()] = p.avatar_url;
+          if (p.username) {
+            userProfiles[p.username.toLowerCase()] = {
+              avatar_url: p.avatar_url || '',
+              bio: p.bio || ''
+            };
+          }
         });
       }
     }
@@ -531,32 +569,64 @@
       return data.publicUrl;
     }
 
-    async function uploadAvatar(event) {
-      const file = event.target.files[0];
-      if (!file || !currentUser) return;
+    function toggleProfileEditor() {
+      ['viewIndex', 'viewBoard', 'viewThread'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById('viewProfileEditor').classList.remove('hidden');
+      document.getElementById('breadcrumbNav').innerHTML = `
+        <a href="javascript:void(0)" onclick="showIndex()">Cantaloupe Chat Forum Index</a> &raquo; <b>Edit Profile</b>
+      `;
 
-      const status = document.getElementById('authStatus');
+      if (currentUser) {
+        const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+        const profile = userProfiles[username.toLowerCase()] || {};
+        document.getElementById('editBioInput').value = profile.bio || '';
+        document.getElementById('editProfileAvatarPreview').src = profile.avatar_url || '';
+      }
+    }
+
+    async function saveProfileChanges() {
+      if (!currentUser) return;
+      const fileInput = document.getElementById('editAvatarFileInput');
+      const bioInput = document.getElementById('editBioInput');
+      const status = document.getElementById('profileEditStatus');
+      const btn = document.getElementById('saveProfileBtn');
+
+      const file = fileInput.files[0];
+      const bio = bioInput.value.trim();
+      const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      const lKey = username.toLowerCase();
+
+      btn.disabled = true;
       status.style.color = '#d35400';
-      status.textContent = 'Uploading new avatar...';
+      status.textContent = 'Saving profile...';
 
       try {
-        const publicUrl = await uploadImageToStorage(file, 'avatars');
-        const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+        let avatarUrl = userProfiles[lKey]?.avatar_url || '';
+        if (file) {
+          status.textContent = 'Uploading new avatar...';
+          avatarUrl = await uploadImageToStorage(file, 'avatars');
+        }
 
-        const { error } = await db.from('profiles').upsert({ username, avatar_url: publicUrl });
+        const { error } = await db.from('profiles').upsert({
+          username: username,
+          avatar_url: avatarUrl,
+          bio: bio
+        });
+
         if (error) throw error;
 
-        userAvatars[username.toLowerCase()] = publicUrl;
+        userProfiles[lKey] = { avatar_url: avatarUrl, bio: bio };
         status.style.color = '#27ae60';
-        status.textContent = 'Avatar updated!';
-        setTimeout(() => { status.textContent = ''; }, 3000);
-
-        if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id);
+        status.textContent = 'Profile updated successfully!';
+        fileInput.value = '';
+        setTimeout(() => { showIndex(); }, 1200);
       } catch (err) {
         status.style.color = '#c0392b';
-        status.textContent = 'Avatar upload failed: ' + err.message;
+        status.textContent = err.message;
       } finally {
-        event.target.value = '';
+        btn.disabled = false;
       }
     }
 
@@ -566,7 +636,6 @@
         return;
       }
 
-      // Check if user already voted on this item
       const { data: existing } = await db
         .from('votes')
         .select('*')
@@ -577,14 +646,11 @@
 
       if (existing) {
         if (existing.vote_type === voteType) {
-          // Clicking same vote removes it (toggle off)
           await db.from('votes').delete().eq('id', existing.id);
         } else {
-          // Switch vote type
           await db.from('votes').update({ vote_type: voteType }).eq('id', existing.id);
         }
       } else {
-        // Insert new vote
         await db.from('votes').insert({
           user_id: currentUser.id,
           target_id: targetId,
@@ -683,10 +749,11 @@
 
     async function signOut() {
       await db.auth.signOut();
+      showIndex();
     }
 
     function switchView(viewId) {
-      ['viewIndex', 'viewBoard', 'viewThread'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor'].forEach(id => {
         document.getElementById(id).classList.toggle('hidden', id !== viewId);
       });
     }
@@ -857,7 +924,7 @@
 
     async function openThread(threadId) {
       switchView('viewThread');
-      await loadAvatars();
+      await loadProfiles();
 
       const { data: thread, error } = await db.from('messages').select('*').eq('id', threadId).single();
       if (error || !thread) return;
@@ -899,7 +966,10 @@
         const postCount = counts[uname] || 1;
         const isAdmin = uname.toLowerCase() === 'biggie';
         const isOnline = onlineUsernames.has(uname.toLowerCase());
-        const avatarUrl = userAvatars[uname.toLowerCase()];
+        
+        const profile = userProfiles[uname.toLowerCase()] || {};
+        const avatarUrl = profile.avatar_url;
+        const bio = profile.bio;
 
         const postVotes = (allVotes || []).filter(v => v.target_id === p.id && v.target_type === p.targetType);
         const score = postVotes.reduce((acc, v) => acc + v.vote_type, 0);
@@ -932,6 +1002,7 @@
                   </span>
                   ${isAdmin ? '<div class="admin-badge">Site Admin</div>' : '<div class="author-rank">Forum Member</div>'}
                   ${avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(uname)}'s avatar" class="author-avatar" />` : ''}
+                  ${bio ? `<div class="author-bio">"${escapeHtml(bio)}"</div>` : ''}
                   <div class="author-stats">
                     Posts: <b>${postCount}</b>
                   </div>
