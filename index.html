@@ -11,7 +11,6 @@
       --card: #ffffff;
       --primary: #ff8c42;
       --primary-dark: #e06d24;
-      --accent: #4caf50;
       --text: #2d2a26;
       --muted: #7a7267;
       --border: #eedcc8;
@@ -27,7 +26,7 @@
     }
     .container {
       width: 100%;
-      max-width: 600px;
+      max-width: 650px;
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 16px;
@@ -55,13 +54,14 @@
     }
     button:hover { background: var(--primary-dark); }
     button.secondary { background: #eee6dc; color: var(--text); }
-    input, textarea {
+    input, textarea, select {
       width: 100%;
       padding: 10px;
       border: 1px solid var(--border);
       border-radius: 8px;
       font-size: 1rem;
       margin-bottom: 10px;
+      background: #fff;
     }
     .auth-box {
       background: #fff4e8;
@@ -69,11 +69,15 @@
       border-radius: 12px;
       margin-bottom: 16px;
     }
+    .board-nav {
+      margin-bottom: 16px;
+    }
+    .board-nav label { font-size: 0.85rem; font-weight: 700; color: var(--muted); display: block; margin-bottom: 4px; }
     .messages {
       display: flex;
       flex-direction: column;
       gap: 12px;
-      max-height: 55vh;
+      max-height: 50vh;
       overflow-y: auto;
       margin-bottom: 16px;
       padding-right: 4px;
@@ -92,6 +96,7 @@
       margin-bottom: 4px;
     }
     .msg-user { font-weight: 700; color: var(--primary-dark); }
+    .msg-tag { background: #fee8d6; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: var(--primary-dark); margin-bottom: 6px; display: inline-block; font-weight: 600;}
     .msg-body { white-space: pre-wrap; word-break: break-word; }
     .hidden { display: none; }
     .status { font-size: 0.85rem; color: #c0392b; margin-top: 6px; }
@@ -117,6 +122,20 @@
       <div id="authStatus" class="status"></div>
     </div>
 
+    <!-- Category Filter Navigation -->
+    <div class="board-nav">
+      <label for="categoryFilter">Select Board:</label>
+      <select id="categoryFilter" onchange="loadMessages()">
+        <option value="All">🌐 All Boards (Combined Feed)</option>
+        <option value="Misc/Anything">Misc/Anything</option>
+        <option value="Movies/Music/Entertainment/Etc.">Movies/Music/Entertainment/Etc.</option>
+        <option value="Personal/Dump">Personal/Dump</option>
+        <option value="Pro Wrestling">Pro Wrestling</option>
+        <option value="Technology/Social Media/AI">Technology/Social Media/AI</option>
+        <option value="World Events/News/Politics">World Events/News/Politics</option>
+      </select>
+    </div>
+
     <!-- Message Feed -->
     <div id="messagesList" class="messages">
       <div style="color: var(--muted); text-align: center;">Loading messages...</div>
@@ -124,6 +143,15 @@
 
     <!-- Post Form (Logged-in users only) -->
     <div id="postSection" class="hidden">
+      <label for="postCategory" style="font-size: 0.85rem; font-weight: 700; color: var(--muted);">Post to Board:</label>
+      <select id="postCategory">
+        <option value="Misc/Anything">Misc/Anything</option>
+        <option value="Movies/Music/Entertainment/Etc.">Movies/Music/Entertainment/Etc.</option>
+        <option value="Personal/Dump">Personal/Dump</option>
+        <option value="Pro Wrestling">Pro Wrestling</option>
+        <option value="Technology/Social Media/AI">Technology/Social Media/AI</option>
+        <option value="World Events/News/Politics">World Events/News/Politics</option>
+      </select>
       <textarea id="messageInput" rows="2" placeholder="Write a message to the board..."></textarea>
       <button onclick="postMessage()" style="width: 100%;">Post Message</button>
       <div id="postStatus" class="status"></div>
@@ -147,7 +175,6 @@
 
       await loadMessages();
 
-      // Listen for new messages in real time
       db.channel('public:messages')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
           loadMessages();
@@ -179,7 +206,7 @@
         status.textContent = error.message;
       } else {
         status.style.color = '#2e7d32';
-        status.textContent = data.session ? 'Signed in!' : 'Check your email to confirm your account (or disable email confirmation in Supabase Auth settings).';
+        status.textContent = data.session ? 'Signed in!' : 'Check your email to confirm your account.';
       }
     }
 
@@ -204,11 +231,15 @@
 
     async function loadMessages() {
       const list = document.getElementById('messagesList');
-      const { data, error } = await db
-        .from('messages')
-        .select('*')
-        .order('created_at', { ascending: true })
-        .limit(100);
+      const selectedCategory = document.getElementById('categoryFilter').value;
+
+      let query = db.from('messages').select('*').order('created_at', { ascending: true }).limit(100);
+
+      if (selectedCategory !== 'All') {
+        query = query.eq('category', selectedCategory);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         list.innerHTML = `<div style="color:#c0392b;">Error loading messages: ${error.message}</div>`;
@@ -216,7 +247,7 @@
       }
 
       if (!data.length) {
-        list.innerHTML = `<div style="color:var(--muted); text-align:center;">No messages yet. Be the first to say hello!</div>`;
+        list.innerHTML = `<div style="color:var(--muted); text-align:center;">No messages in this board yet. Be the first!</div>`;
         return;
       }
 
@@ -228,6 +259,7 @@
               <span class="msg-user">${escapeHtml(m.username || 'Anonymous')}</span>
               <span>${time}</span>
             </div>
+            <div class="msg-tag">📁 ${escapeHtml(m.category || 'Misc/Anything')}</div>
             <div class="msg-body">${escapeHtml(m.message)}</div>
           </div>
         `;
@@ -238,6 +270,7 @@
     async function postMessage() {
       if (!currentUser) return;
       const input = document.getElementById('messageInput');
+      const categorySelect = document.getElementById('postCategory');
       const status = document.getElementById('postStatus');
       const text = input.value.trim();
       if (!text) return;
@@ -248,7 +281,8 @@
       const { error } = await db.from('messages').insert({
         user_id: currentUser.id,
         username: username,
-        message: text
+        message: text,
+        category: categorySelect.value
       });
 
       if (error) {
