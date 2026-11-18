@@ -1465,6 +1465,24 @@
       } catch (e) {}
     }
 
+    function getReadDmIds(username) {
+      try {
+        const raw = localStorage.getItem('cantaloupe_read_dms_' + username.toLowerCase());
+        return new Set(raw ? JSON.parse(raw) : []);
+      } catch (e) {
+        return new Set();
+      }
+    }
+
+    function markDmsReadLocally(username, ids) {
+      if (!username || !ids || ids.length === 0) return;
+      try {
+        const set = getReadDmIds(username);
+        ids.forEach(id => set.add(id));
+        localStorage.setItem('cantaloupe_read_dms_' + username.toLowerCase(), JSON.stringify(Array.from(set).slice(-500)));
+      } catch (e) {}
+    }
+
     function toggleNotificationsPanel() {
       const panel = document.getElementById('notifPanel');
       if (panel) panel.classList.toggle('hidden');
@@ -1493,15 +1511,18 @@
         .order('created_at', { ascending: false })
         .limit(50);
 
-      const dmNotifs = (allPms || []).map(pm => ({
-        key: 'dm-' + pm.id,
-        type: 'dm',
-        id: pm.id,
-        from: pm.sender_username,
-        text: `DM from ${pm.sender_username}: "${(pm.message || pm.subject || '').slice(0, 55)}"`,
-        created_at: pm.created_at,
-        unread: !pm.read_status
-      }));
+      const readDms = getReadDmIds(myUsername);
+      const dmNotifs = (allPms || [])
+        .filter(pm => !pm.read_status && !readDms.has(pm.id))
+        .map(pm => ({
+          key: 'dm-' + pm.id,
+          type: 'dm',
+          id: pm.id,
+          from: pm.sender_username,
+          text: `DM from ${pm.sender_username}: "${(pm.message || pm.subject || '').slice(0, 55)}"`,
+          created_at: pm.created_at,
+          unread: true
+        }));
 
       const quoteNotifs = (quoteReplies || [])
         .filter(r => (r.username || '').toLowerCase() !== lName)
@@ -1669,8 +1690,9 @@
 
       const unreadDmIds = siteNotifications.filter(n => n.type === 'dm' && n.unread).map(n => n.id);
       if (unreadDmIds.length > 0) {
-        await db.from('private_messages').update({ read_status: true }).in('id', unreadDmIds);
+        markDmsReadLocally(myUsername, unreadDmIds);
         updateInboxCount();
+        try { await db.from('private_messages').update({ read_status: true }).in('id', unreadDmIds); } catch (e) {}
       }
 
       siteNotifications = [];
@@ -1693,8 +1715,9 @@
 
       const unreadDmIds = siteNotifications.filter(n => n.type === 'dm').map(n => n.id);
       if (unreadDmIds.length > 0) {
-        await db.from('private_messages').update({ read_status: true }).in('id', unreadDmIds);
+        markDmsReadLocally(myUsername, unreadDmIds);
         updateInboxCount();
+        try { await db.from('private_messages').update({ read_status: true }).in('id', unreadDmIds); } catch (e) {}
       }
 
       renderNotifications();
@@ -1843,18 +1866,26 @@
           if (!document.getElementById('viewUserProfile').classList.contains('hidden') && viewedProfileUsername) openProfile(viewedProfileUsername, false);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'private_messages' }, (payload) => {
+          const inActiveChat = !document.getElementById('viewInbox').classList.contains('hidden')
+            && currentChatPartner
+            && !document.getElementById('privateChatView').classList.contains('hidden');
+
           if (currentUser) {
-            updateInboxCount();
-            loadNotifications();
+            const myUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
             if (payload.eventType === 'INSERT' && payload.new) {
-              const myUsername = (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase();
-              if ((payload.new.recipient_username || '').toLowerCase() === myUsername) {
+              const isForMe = (payload.new.recipient_username || '').toLowerCase() === myUsername.toLowerCase();
+              const isFromActivePartner = inActiveChat && (payload.new.sender_username || '').toLowerCase() === currentChatPartner.toLowerCase();
+              if (isForMe && isFromActivePartner) {
+                markDmsReadLocally(myUsername, [payload.new.id]);
+              } else if (isForMe) {
                 showToast(`💬 New DM from ${payload.new.sender_username}! Click to chat.`, () => openPrivateChat(payload.new.sender_username));
               }
             }
+            updateInboxCount();
+            loadNotifications();
           }
           if (!document.getElementById('viewInbox').classList.contains('hidden')) {
-            if (currentChatPartner && !document.getElementById('privateChatView').classList.contains('hidden')) {
+            if (inActiveChat) {
               loadPrivateChatMessages(currentChatPartner);
             } else {
               openInbox(false);
@@ -2639,13 +2670,14 @@
     async function updateInboxCount() {
       if (!currentUser) return;
       const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      const readDms = getReadDmIds(username);
       const { data } = await db
         .from('private_messages')
         .select('id, read_status')
-        .eq('recipient_username', username)
+        .ilike('recipient_username', username)
         .eq('read_status', false);
 
-      const unread = data ? data.length : 0;
+      const unread = (data || []).filter(m => !readDms.has(m.id)).length;
       document.getElementById('inboxBtn').textContent = unread > 0 ? `Inbox (${unread} New)` : `Inbox (0)`;
     }
 
@@ -2691,13 +2723,13 @@
             otherUser: otherUser,
             latestPm: pm,
             isIncoming: isIncoming,
-            unreadCount: (isIncoming && !pm.read_status) ? 1 : 0,
+            unreadCount: (isIncoming && !pm.read_status && !getReadDmIds(username).has(pm.id)) ? 1 : 0,
             totalCount: 1
           });
         } else {
           const entry = convMap.get(key);
           entry.totalCount += 1;
-          if (isIncoming && !pm.read_status) entry.unreadCount += 1;
+          if (isIncoming && !pm.read_status && !getReadDmIds(username).has(pm.id)) entry.unreadCount += 1;
         }
       });
 
@@ -2796,9 +2828,10 @@
         .map(m => m.id);
 
       if (unreadIds.length > 0) {
-        await db.from('private_messages').update({ read_status: true }).in('id', unreadIds);
+        markDmsReadLocally(myUsername, unreadIds);
         updateInboxCount();
         loadNotifications();
+        try { await db.from('private_messages').update({ read_status: true }).in('id', unreadIds); } catch (e) {}
       }
 
       container.innerHTML = msgs.map(m => {
@@ -2901,9 +2934,10 @@
       currentPmSender = isIncoming ? pm.sender_username : pm.recipient_username;
 
       if (isIncoming && !pm.read_status) {
-        await db.from('private_messages').update({ read_status: true }).eq('id', pmId);
+        markDmsReadLocally(username, [pmId]);
         updateInboxCount();
         loadNotifications();
+        try { await db.from('private_messages').update({ read_status: true }).eq('id', pmId); } catch (e) {}
       }
 
       document.getElementById('pmTable').classList.add('hidden');
