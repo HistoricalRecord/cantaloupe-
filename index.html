@@ -809,6 +809,116 @@
       border: 2px solid #e67e22;
       box-shadow: 0 0 12px rgba(230, 126, 34, 0.35);
     }
+
+    /* Dark Mode Theme */
+    body.dark-mode {
+      background-color: #161412;
+      color: #efe7de;
+    }
+    body.dark-mode a { color: #ff9f43; }
+    body.dark-mode a:hover { color: #feca57; }
+    body.dark-mode .forum-wrapper {
+      background: #221e1b;
+      border-color: #4a3b30;
+    }
+    body.dark-mode .user-bar,
+    body.dark-mode .breadcrumb,
+    body.dark-mode .pagination-bar,
+    body.dark-mode .footer-bar,
+    body.dark-mode .stats-box,
+    body.dark-mode .form-box,
+    body.dark-mode .auth-portal-container,
+    body.dark-mode .post-footer-actions {
+      background: #2a2521;
+      border-color: #4a3b30;
+      color: #e6ddd3;
+    }
+    body.dark-mode .post-box,
+    body.dark-mode .profile-card,
+    body.dark-mode .chat-box,
+    body.dark-mode .auth-portal-card,
+    body.dark-mode .app-modal-box,
+    body.dark-mode .notif-panel {
+      background: #221e1b;
+      border-color: #4a3b30;
+      color: #efe7de;
+    }
+    body.dark-mode .post-header,
+    body.dark-mode .chat-header {
+      background: #362c24;
+      border-color: #4a3b30;
+      color: #f5e9dc;
+    }
+    body.dark-mode .post-author-cell,
+    body.dark-mode .profile-sidebar,
+    body.dark-mode .chat-messages,
+    body.dark-mode .chat-input-bar,
+    body.dark-mode .profile-bio-box {
+      background: #26211d;
+      border-color: #4a3b30;
+      color: #e6ddd3;
+    }
+    body.dark-mode .post-content-cell a {
+      color: #74b9ff !important;
+    }
+    body.dark-mode .bbcode-quote {
+      background: #2e2721;
+      border-color: #4a3b30;
+      color: #dfd4c8;
+    }
+    body.dark-mode table.forum-table td {
+      border-color: #3d3128;
+    }
+    body.dark-mode tr.row-odd td { background-color: #221e1b; }
+    body.dark-mode tr.row-even td { background-color: #27221e; }
+    body.dark-mode tr.row-even:hover td,
+    body.dark-mode tr.row-odd:hover td { background-color: #382e26; }
+    body.dark-mode tr.sticky-row td { background-color: #33271d !important; }
+    body.dark-mode .board-desc,
+    body.dark-mode .author-stats,
+    body.dark-mode .author-bio,
+    body.dark-mode .author-rank,
+    body.dark-mode .last-post-col,
+    body.dark-mode .stats-body,
+    body.dark-mode .notif-item-meta,
+    body.dark-mode .chat-meta {
+      color: #b8aba0;
+    }
+    body.dark-mode input,
+    body.dark-mode textarea {
+      background: #1b1815;
+      color: #efe7de;
+      border-color: #5c493b;
+    }
+    body.dark-mode button {
+      background: #382e26;
+      color: #f5e9dc;
+      border-color: #5c493b;
+    }
+    body.dark-mode button:hover { background: #4a3b30; }
+    body.dark-mode button.primary-btn {
+      background: #e67e22;
+      color: #ffffff;
+      border-color: #ba4a00;
+    }
+    body.dark-mode .notif-item {
+      background: #221e1b;
+      border-color: #3d3128;
+    }
+    body.dark-mode .notif-item.unread {
+      background: #34281e;
+    }
+    body.dark-mode .chat-bubble.me {
+      background: #422e1d;
+      border-color: #b8651b;
+    }
+    body.dark-mode .chat-bubble.them {
+      background: #2c2622;
+      border-color: #4a3b30;
+    }
+    body.dark-mode .app-modal-body {
+      color: #efe7de;
+    }
   </style>
 </head>
 <body>
@@ -826,6 +936,7 @@
         <input type="text" id="searchInput" placeholder="Search forums..." style="width:130px; height:24px;" />
         <button onclick="performSearch()">Search</button>
         <button onclick="navigateHome()">Home</button>
+        <button id="themeToggleBtn" type="button" onclick="toggleDarkMode()" title="Toggle Dark Mode">🌙</button>
       </div>
     </div>
 
@@ -1589,7 +1700,26 @@
       document.getElementById('notifPanel').classList.add('hidden');
     }
 
+
+    function applySavedTheme() {
+      try {
+        const isDark = localStorage.getItem('cantaloupe_dark_mode') === 'true';
+        document.body.classList.toggle('dark-mode', isDark);
+        const btn = document.getElementById('themeToggleBtn');
+        if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+      } catch (e) {}
+    }
+
+    function toggleDarkMode() {
+      const isDark = !document.body.classList.contains('dark-mode');
+      document.body.classList.toggle('dark-mode', isDark);
+      const btn = document.getElementById('themeToggleBtn');
+      if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+      try { localStorage.setItem('cantaloupe_dark_mode', String(isDark)); } catch (e) {}
+    }
+
     async function init() {
+      applySavedTheme();
       const { data: { session } } = await db.auth.getSession();
       updateAuthState(session?.user || null);
 
@@ -1884,6 +2014,13 @@
       if (!cell) return;
 
       cell.innerHTML = `
+        <div class="bbcode-bar">
+          <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'b')"><b>B</b></button>
+          <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'i')"><i>I</i></button>
+          <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'u')"><u>U</u></button>
+          <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'url')">URL</button>
+          <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'quote')">Quote</button>
+        </div>
         <textarea id="editText-${targetType}-${id}" rows="4" style="width:100%; margin-bottom:6px;">${escapeHtml(currentMessage)}</textarea>
         <div style="display:flex; gap:6px;">
           <button class="primary-btn" onclick="saveEditedPost(${id}, '${targetType}')">Save Edit</button>
