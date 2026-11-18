@@ -1148,17 +1148,24 @@
 
     <!-- VIEW 3: SINGLE THREAD & REPLIES -->
     <div id="viewThread" class="hidden">
-      <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1; display:flex; justify-content:space-between; align-items:center;">
+      <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
         <strong id="singleThreadTitle" style="font-size:13px; color:#d35400;">Thread Title</strong>
-        <button onclick="openBoard(currentBoard)">&laquo; Back to Board</button>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button id="jumpToReplyBtn" onclick="jumpToReplyBox()">&darr; Reply</button>
+          <button onclick="openBoard(currentBoard)">&laquo; Back to Board</button>
+        </div>
       </div>
 
       <div id="threadLockedNotice" class="hidden" style="background:#fadbd8; color:#78281f; padding:8px 12px; font-size:11px; font-weight:bold; border-bottom:1px solid #f5b7b1; text-align:center;">
         🔒 This thread has been locked by an administrator. New replies are disabled.
       </div>
 
+      <div id="threadPaginationHeader" class="pagination-bar hidden"></div>
       <div id="threadPostsContainer"></div>
       <div id="threadPaginationTop" class="pagination-bar"></div>
+      <div style="padding:6px 10px; text-align:right; background:#fff9f2; border-top:1px solid #f3dcd1;">
+        <button type="button" onclick="scrollToForumTop()" style="font-size:10px; padding:2px 8px;">&uarr; Back to Top</button>
+      </div>
 
       <!-- Quick Reply Box -->
       <div id="replyFormBox" class="form-box hidden">
@@ -1902,6 +1909,37 @@
       } else {
         openThread(currentThread.id, currentThreadPage, false);
       }
+    }
+
+
+    function jumpToReplyBox() {
+      const box = document.getElementById('replyFormBox');
+      const ta = document.getElementById('replyBodyInput');
+      if (box && !box.classList.contains('hidden')) {
+        box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (ta) ta.focus();
+      }
+    }
+
+    function scrollToForumTop() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function getThreadSeenMap(username) {
+      try {
+        const raw = localStorage.getItem('cantaloupe_thread_seen_' + username.toLowerCase());
+        return raw ? JSON.parse(raw) : {};
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function markThreadSeen(username, threadId, tsMs) {
+      try {
+        const map = getThreadSeenMap(username);
+        map[threadId] = Math.max(map[threadId] || 0, tsMs || Date.now());
+        localStorage.setItem('cantaloupe_thread_seen_' + username.toLowerCase(), JSON.stringify(map));
+      } catch (e) {}
     }
 
     function toggleProfileEditor(pushHistory = true) {
@@ -2760,25 +2798,60 @@
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
-      const { data: messages } = await db
-        .from('messages')
-        .select('*')
-        .or(`title.ilike.%${query}%,message.ilike.%${query}%`)
-        .order('created_at', { ascending: false });
+      const [{ data: messages }, { data: replyMatches }] = await Promise.all([
+        db.from('messages')
+          .select('*')
+          .or(`title.ilike.%${query}%,message.ilike.%${query}%`)
+          .order('created_at', { ascending: false })
+          .limit(30),
+        db.from('replies')
+          .select('*')
+          .ilike('message', `%${query}%`)
+          .order('created_at', { ascending: false })
+          .limit(30)
+      ]);
+
+      const combined = [
+        ...(messages || []).map(m => ({
+          kind: 'Thread',
+          threadId: m.id,
+          postId: m.id,
+          title: m.title || 'Untitled Thread',
+          sub: `Board: ${m.category}`,
+          username: m.username || 'Member',
+          created_at: m.created_at
+        })),
+        ...(replyMatches || []).map(r => ({
+          kind: 'Reply',
+          threadId: r.thread_id,
+          postId: r.id,
+          title: `Reply in Thread #${r.thread_id}: "${(r.message || '').slice(0, 65)}${(r.message || '').length > 65 ? '...' : ''}"`,
+          sub: 'Matched inside comment',
+          username: r.username || 'Member',
+          created_at: r.created_at
+        }))
+      ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
       const tbody = document.getElementById('searchResultsBody');
-      if (!messages || messages.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:18px; color:#555;">No matching threads found.</td></tr>`;
+      if (combined.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:18px; color:#555;">No matching threads or replies found.</td></tr>`;
         return;
       }
 
-      tbody.innerHTML = messages.map((m, idx) => {
+      tbody.innerHTML = combined.map((item, idx) => {
         const rowClass = idx % 2 === 0 ? 'row-odd' : 'row-even';
+        const clickAction = item.kind === 'Reply'
+          ? `openThread(${item.threadId}, 1, true, { type: 'reply', id: ${item.postId} })`
+          : `openThread(${item.threadId}, 1)`;
         return `
           <tr class="${rowClass}">
-            <td><a href="javascript:void(0)" onclick="openThread(${m.id}, 1)">${escapeHtml(m.title)}</a><div class="board-desc">Category: ${escapeHtml(m.category)}</div></td>
-            <td><a href="javascript:void(0)" onclick="openProfile('${escapeHtml(m.username)}')">${escapeHtml(m.username)}</a></td>
-            <td class="last-post-col">${formatDate(m.created_at)}</td>
+            <td>
+              <b style="font-size:10px; color:#7a7267;">[${item.kind}]</b>
+              <a href="javascript:void(0)" onclick="${clickAction}">${escapeHtml(item.title)}</a>
+              <div class="board-desc">${escapeHtml(item.sub)}</div>
+            </td>
+            <td><a href="javascript:void(0)" onclick="openProfile('${escapeHtml(item.username)}')">${escapeHtml(item.username)}</a></td>
+            <td class="last-post-col">${formatDate(item.created_at)}</td>
           </tr>
         `;
       }).join('');
@@ -3103,10 +3176,14 @@
       });
 
       const isAdmin = checkIsAdmin();
+      const myUname = currentUser ? (currentUser.user_metadata?.username || currentUser.email.split('@')[0]) : '';
+      const threadSeenMap = myUname ? getThreadSeenMap(myUname) : {};
 
       tbody.innerHTML = sortedThreads.map((t, idx) => {
         const replyCount = allReplies.filter(r => r.thread_id === t.id).length;
         const rowClass = t.is_sticky ? 'sticky-row' : (idx % 2 === 0 ? 'row-odd' : 'row-even');
+        const isUnread = (lastActivityMap[t.id] || 0) > (threadSeenMap[t.id] || 0);
+        const newBadge = isUnread ? '<span style="background:#e67e22; color:#fff; font-size:9px; font-weight:bold; padding:1px 4px; border-radius:2px; margin-right:4px;">NEW</span>' : '';
         const stickyPrefix = t.is_sticky ? '<b style="color:#e67e22;">[Sticky] 📌</b> ' : '';
         const lockedPrefix = t.is_locked ? '<b style="color:#c0392b;">[Locked] 🔒</b> ' : '';
         const stickyBtn = isAdmin ? ` <button style="font-size:9px; padding:1px 4px;" onclick="toggleSticky(${t.id}, ${!t.is_sticky})">${t.is_sticky ? 'Unpin' : 'Pin'}</button>` : '';
@@ -3114,7 +3191,7 @@
 
         return `
           <tr class="${rowClass}">
-            <td>${lockedPrefix}${stickyPrefix}<a href="javascript:void(0)" onclick="openThread(${t.id}, 1)">${escapeHtml(t.title || 'Untitled Thread')}</a>${stickyBtn}</td>
+            <td>${newBadge}${lockedPrefix}${stickyPrefix}<a href="javascript:void(0)" onclick="openThread(${t.id}, 1)">${escapeHtml(t.title || 'Untitled Thread')}</a>${stickyBtn}</td>
             <td><a href="javascript:void(0)" onclick="openProfile('${escapeHtml(authorName)}')">${escapeHtml(authorName)}</a></td>
             <td class="center-col">${replyCount}</td>
             <td class="last-post-col">${formatDate(t.created_at)}</td>
@@ -3229,12 +3306,15 @@
       // Handle locked notice and reply form visibility
       const lockedNotice = document.getElementById('threadLockedNotice');
       const replyFormBox = document.getElementById('replyFormBox');
+      const jumpBtn = document.getElementById('jumpToReplyBtn');
       if (thread.is_locked) {
         lockedNotice.classList.remove('hidden');
         replyFormBox.classList.add('hidden');
+        if (jumpBtn) jumpBtn.classList.add('hidden');
       } else {
         lockedNotice.classList.add('hidden');
         replyFormBox.classList.remove('hidden');
+        if (jumpBtn) jumpBtn.classList.remove('hidden');
       }
 
       const { data: replies } = await db
@@ -3389,8 +3469,18 @@
           }
         }
       }
+      document.getElementById('threadPaginationHeader').innerHTML = paginationHtml;
+      document.getElementById('threadPaginationHeader').classList.toggle('hidden', totalPages <= 1);
       document.getElementById('threadPaginationTop').innerHTML = paginationHtml;
       document.getElementById('threadPaginationTop').classList.toggle('hidden', totalPages <= 1);
+
+      if (currentUser) {
+        const myUname = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+        const latestPostTime = allLoadedPosts.length > 0
+          ? new Date(allLoadedPosts[allLoadedPosts.length - 1].created_at).getTime()
+          : Date.now();
+        markThreadSeen(myUname, threadId, Math.max(latestPostTime, Date.now()));
+      }
 
       if (focusPost && focusPost.type && focusPost.id != null) {
         const targetEl = document.getElementById(`post-box-${focusPost.type}-${focusPost.id}`);
