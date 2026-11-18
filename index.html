@@ -98,6 +98,8 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
     }
 
     /* Classic Forum Tables with Cantaloupe Accents */
@@ -245,6 +247,13 @@
       margin-bottom: 2px;
       word-break: break-word;
     }
+    .author-name a {
+      color: #d35400;
+      text-decoration: none;
+    }
+    .author-name a:hover {
+      text-decoration: underline;
+    }
     .author-rank { font-size: 10px; color: #7a7267; margin-bottom: 2px; }
     .author-stars { font-size: 11px; color: #f39c12; margin-bottom: 6px; letter-spacing: 1px; }
     .admin-badge {
@@ -270,13 +279,26 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
-    .post-content-cell a { 
-      color: #1b4d89 !important; 
-      text-decoration: underline !important; 
-      font-weight: bold !important; 
+    .post-content-cell a {
+      color: #1b4d89 !important;
+      text-decoration: underline !important;
+      font-weight: bold !important;
     }
-    .post-content-cell a:hover { 
-      color: #d35400 !important; 
+    .post-content-cell a:hover {
+      color: #d35400 !important;
+    }
+    .post-footer-actions {
+      background: #fff9f2;
+      border-top: 1px solid #f3dcd1;
+      padding: 5px 10px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .post-footer-actions button {
+      font-size: 10px;
+      padding: 3px 8px;
     }
     .post-embedded-img {
       display: block;
@@ -311,6 +333,152 @@
       font-style: italic;
       background: #f9f9f9;
       text-align: center;
+    }
+
+    /* Profile Landing Page */
+    .profile-card {
+      margin: 10px;
+      border: 1px solid #e0b492;
+      background: #ffffff;
+    }
+    .profile-card-header {
+      background: linear-gradient(180deg, #f39c12 0%, #d35400 100%);
+      color: #ffffff;
+      padding: 8px 12px;
+      font-weight: bold;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .profile-card-body {
+      display: flex;
+      flex-wrap: wrap;
+    }
+    .profile-sidebar {
+      width: 210px;
+      background: #fff9f2;
+      border-right: 1px solid #f3dcd1;
+      padding: 14px;
+      text-align: center;
+    }
+    .profile-avatar-lg {
+      width: 110px;
+      height: 110px;
+      object-fit: cover;
+      border: 2px solid #d3a081;
+      background: #ffffff;
+      padding: 3px;
+      margin: 0 auto 8px auto;
+      display: block;
+    }
+    .profile-avatar-placeholder {
+      width: 110px;
+      height: 110px;
+      border: 2px solid #d3a081;
+      background: #fdebd0;
+      color: #d35400;
+      font-size: 40px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 8px auto;
+    }
+    .profile-main {
+      flex: 1;
+      min-width: 240px;
+      padding: 14px;
+    }
+    .profile-section-label {
+      font-size: 10px;
+      font-weight: bold;
+      text-transform: uppercase;
+      color: #7a7267;
+      margin-bottom: 4px;
+    }
+    .profile-bio-box {
+      background: #fff9f5;
+      border: 1px solid #f3dcd1;
+      padding: 8px 10px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .profile-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed #e8ccc0;
+    }
+
+    /* Private Chat Window */
+    .chat-box {
+      margin: 10px;
+      border: 1px solid #e0b492;
+      background: #ffffff;
+    }
+    .chat-header {
+      background: #fdebd0;
+      border-bottom: 1px solid #e0b492;
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: bold;
+      color: #78281f;
+    }
+    .chat-messages {
+      height: 320px;
+      overflow-y: auto;
+      padding: 12px;
+      background: #fff9f5;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .chat-bubble {
+      max-width: 78%;
+      padding: 8px 10px;
+      border: 1px solid #e0b492;
+      border-radius: 4px;
+      font-size: 11px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+    .chat-bubble.me {
+      align-self: flex-end;
+      background: #fdebd0;
+      border-color: #e67e22;
+    }
+    .chat-bubble.them {
+      align-self: flex-start;
+      background: #ffffff;
+      border-color: #d3a081;
+    }
+    .chat-meta {
+      font-size: 9px;
+      color: #7a7267;
+      margin-bottom: 3px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .chat-input-bar {
+      display: flex;
+      gap: 6px;
+      padding: 10px;
+      background: #fff9f2;
+      border-top: 1px solid #e8ccc0;
+      align-items: flex-end;
+    }
+    .chat-input-bar textarea {
+      flex: 1;
+      resize: vertical;
+      min-height: 44px;
     }
 
     /* Standalone Auth Portal */
@@ -484,6 +652,63 @@
       .post-author-cell { width: 105px; padding: 8px; }
       .author-avatar { width: 64px; height: 64px; }
       .last-post-col { display: none; }
+      .profile-sidebar { width: 100%; border-right: none; border-bottom: 1px solid #f3dcd1; }
+    }
+
+    /* In-page Toast & Modal */
+    .app-toast {
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      background: #2d2a26;
+      color: #ffffff;
+      padding: 10px 14px;
+      border-left: 4px solid #e67e22;
+      font-size: 11px;
+      font-weight: bold;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 9999;
+      max-width: 320px;
+    }
+    .app-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(45, 42, 38, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      padding: 12px;
+    }
+    .app-modal-box {
+      width: 100%;
+      max-width: 380px;
+      background: #ffffff;
+      border: 1px solid #d3a081;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    }
+    .app-modal-header {
+      background: linear-gradient(180deg, #f39c12 0%, #d35400 100%);
+      color: #ffffff;
+      padding: 8px 12px;
+      font-weight: bold;
+      font-size: 12px;
+    }
+    .app-modal-body {
+      padding: 14px;
+      font-size: 11px;
+      color: #2d2a26;
+      line-height: 1.45;
+    }
+    .app-modal-body input {
+      width: 100%;
+      margin-top: 8px;
+    }
+    .app-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      padding: 0 14px 14px 14px;
     }
   </style>
 </head>
@@ -581,11 +806,31 @@
       </div>
     </div>
 
-    <!-- PRIVATE MESSAGING VIEW -->
+    <!-- PRIVATE MESSAGING & LIVE CHAT VIEW -->
     <div id="viewInbox" class="hidden">
-      <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1; display:flex; justify-content:space-between; align-items:center;">
-        <strong style="font-size:13px; color:#d35400;">Private Messages</strong>
-        <button class="primary-btn" onclick="toggleComposePM()">+ Send New Message</button>
+      <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+        <strong style="font-size:13px; color:#d35400;">Private Messages &amp; Direct Chat</strong>
+        <div style="display:flex; gap:6px;">
+          <button onclick="openInbox()">All Messages</button>
+          <button class="primary-btn" onclick="toggleComposePM()">+ New PM / Chat</button>
+        </div>
+      </div>
+
+      <!-- Direct Private Chat View -->
+      <div id="privateChatView" class="chat-box hidden">
+        <div class="chat-header">
+          <span id="privateChatTitle">Private Chat</span>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <button id="chatViewProfileBtn" onclick="openProfile(currentChatPartner)">View Profile</button>
+            <button onclick="openInbox()">&laquo; All Messages</button>
+          </div>
+        </div>
+        <div id="privateChatMessages" class="chat-messages"></div>
+        <div class="chat-input-bar">
+          <textarea id="privateChatInput" rows="2" placeholder="Write a private message... (Press Enter to send, Shift+Enter for new line)"></textarea>
+          <button class="primary-btn" id="sendPrivateChatBtn" onclick="sendPrivateChatMessage()">Send</button>
+        </div>
+        <div id="privateChatStatus" class="status-msg" style="padding: 0 10px 8px 10px;"></div>
       </div>
 
       <div id="composePMBox" class="form-box hidden">
@@ -605,7 +850,10 @@
         <div class="form-box-body">
           <div style="font-size:10px; color:#7a7267; margin-bottom:6px;" id="pmViewMeta">From: User</div>
           <div id="pmViewContent" style="white-space:pre-wrap; line-height:1.45; margin-bottom:10px;">Body</div>
-          <button onclick="openInbox()">Back to Inbox</button>
+          <div style="display:flex; gap:6px;">
+            <button class="primary-btn" id="pmReplyChatBtn" onclick="replyInPrivateChat()">Open Private Chat</button>
+            <button onclick="openInbox()">Back to Inbox</button>
+          </div>
         </div>
       </div>
 
@@ -613,13 +861,22 @@
         <thead>
           <tr>
             <th>Subject</th>
-            <th style="width:130px;">Sender / Recipient</th>
+            <th style="width:150px;">Sender / Recipient</th>
             <th class="last-post-col">Date</th>
-            <th style="width:60px; text-align:center;">Action</th>
+            <th style="width:120px; text-align:center;">Action</th>
           </tr>
         </thead>
         <tbody id="pmTableBody"></tbody>
       </table>
+    </div>
+
+    <!-- MEMBER PROFILE LANDING PAGE VIEW -->
+    <div id="viewUserProfile" class="hidden">
+      <div class="profile-card" id="userProfileCard"></div>
+      <div class="stats-box" style="margin: 10px;">
+        <div class="stats-header" id="profileActivityHeader">Recent Threads &amp; Replies</div>
+        <div class="stats-body" id="profileActivityBody" style="padding:0;"></div>
+      </div>
     </div>
 
     <!-- MEMBER DIRECTORY VIEW -->
@@ -808,7 +1065,11 @@
     const BUCKET_NAME = 'forum-images';
     
     // Initialize Supabase client with dynamic storage based on 'Stay logged in' preference
-    const stayLoggedInChecked = localStorage.getItem('cantaloupe_stay_logged') !== 'false';
+    let stayLoggedInChecked = true;
+    try {
+      stayLoggedInChecked = localStorage.getItem('cantaloupe_stay_logged') !== 'false';
+    } catch (e) {}
+
     const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
       auth: {
         storage: stayLoggedInChecked ? window.localStorage : window.sessionStorage,
@@ -830,6 +1091,9 @@
     let currentBoard = null;
     let currentThread = null;
     let currentThreadPage = 1;
+    let currentChatPartner = null;
+    let currentPmSender = null;
+    let viewedProfileUsername = null;
     const POSTS_PER_PAGE = 50;
 
     let presenceChannel = null;
@@ -841,6 +1105,69 @@
     let allLoadedPosts = [];
     const sessionKey = 'guest-' + Math.random().toString(36).substring(2, 10);
 
+    let appModalResolve = null;
+    let toastTimer = null;
+
+    function showToast(msg) {
+      const el = document.getElementById('appToast');
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.add('hidden'), 3200);
+    }
+
+    function openAppConfirm(message, title = 'Confirm Action') {
+      return new Promise(resolve => {
+        appModalResolve = resolve;
+        document.getElementById('appModalTitle').textContent = title;
+        document.getElementById('appModalMessage').textContent = message;
+        const inp = document.getElementById('appModalInput');
+        inp.classList.add('hidden');
+        inp.value = '';
+        document.getElementById('appModalCancelBtn').classList.remove('hidden');
+        document.getElementById('appModalOverlay').classList.remove('hidden');
+        document.getElementById('appModalOkBtn').focus();
+      });
+    }
+
+    function openAppPrompt(message, defaultVal = '', title = 'Input Required') {
+      return new Promise(resolve => {
+        appModalResolve = resolve;
+        document.getElementById('appModalTitle').textContent = title;
+        document.getElementById('appModalMessage').textContent = message;
+        const inp = document.getElementById('appModalInput');
+        inp.classList.remove('hidden');
+        inp.value = defaultVal;
+        document.getElementById('appModalCancelBtn').classList.remove('hidden');
+        document.getElementById('appModalOverlay').classList.remove('hidden');
+        inp.focus();
+        inp.select();
+      });
+    }
+
+    function submitAppModal() {
+      const inp = document.getElementById('appModalInput');
+      const isPrompt = !inp.classList.contains('hidden');
+      const val = isPrompt ? inp.value : true;
+      document.getElementById('appModalOverlay').classList.add('hidden');
+      if (appModalResolve) {
+        const res = appModalResolve;
+        appModalResolve = null;
+        res(val);
+      }
+    }
+
+    function closeAppModal(val) {
+      document.getElementById('appModalOverlay').classList.add('hidden');
+      if (appModalResolve) {
+        const res = appModalResolve;
+        appModalResolve = null;
+        res(val);
+      }
+    }
+
+
     async function init() {
       const { data: { session } } = await db.auth.getSession();
       updateAuthState(session?.user || null);
@@ -849,6 +1176,16 @@
         updateAuthState(session?.user || null);
         trackUserPresence();
       });
+
+      const chatInput = document.getElementById('privateChatInput');
+      if (chatInput) {
+        chatInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendPrivateChatMessage();
+          }
+        });
+      }
 
       await loadProfiles();
       await loadIgnoredUsers();
@@ -883,10 +1220,17 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async () => {
           await loadProfiles();
           if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage, false);
+          if (!document.getElementById('viewUserProfile').classList.contains('hidden') && viewedProfileUsername) openProfile(viewedProfileUsername, false);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'private_messages' }, () => {
           if (currentUser) updateInboxCount();
-          if (!document.getElementById('viewInbox').classList.contains('hidden')) openInbox(false);
+          if (!document.getElementById('viewInbox').classList.contains('hidden')) {
+            if (currentChatPartner && !document.getElementById('privateChatView').classList.contains('hidden')) {
+              loadPrivateChatMessages(currentChatPartner);
+            } else {
+              openInbox(false);
+            }
+          }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'post_reports' }, () => {
           if (!document.getElementById('viewIndex').classList.contains('hidden')) showIndex();
@@ -900,11 +1244,17 @@
       const board = params.get('board');
       const page = parseInt(params.get('page') || '1', 10);
       const view = params.get('view');
+      const user = params.get('user');
+      const chatUser = params.get('chat');
 
       if (threadId) {
         await openThread(parseInt(threadId, 10), page, false);
       } else if (board) {
         await openBoard(board, false);
+      } else if (view === 'user_profile' && user) {
+        await openProfile(user, false);
+      } else if (view === 'inbox' && chatUser) {
+        await openPrivateChat(chatUser, false);
       } else if (view === 'inbox') {
         await openInbox(false);
       } else if (view === 'members') {
@@ -926,6 +1276,10 @@
         openThread(state.threadId, state.page, false);
       } else if (state.view === 'board') {
         openBoard(state.boardName, false);
+      } else if (state.view === 'user_profile') {
+        openProfile(state.username, false);
+      } else if (state.view === 'private_chat') {
+        openPrivateChat(state.username, false);
       } else if (state.view === 'inbox') {
         openInbox(false);
       } else if (state.view === 'members') {
@@ -944,6 +1298,7 @@
         data.forEach(p => {
           if (p.username) {
             userProfiles[p.username.toLowerCase()] = {
+              username: p.username,
               avatar_url: p.avatar_url || '',
               bio: p.bio || '',
               signature: p.signature || '',
@@ -973,28 +1328,31 @@
 
     async function toggleIgnoreUser(username) {
       if (!currentUser) {
-        alert('Please log in to manage ignore lists.');
+        showToast('Please log in to manage ignore lists.');
         return;
       }
       const lName = username.toLowerCase();
       const myName = (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase();
       if (lName === myName) {
-        alert('You cannot ignore yourself.');
+        showToast('You cannot ignore yourself.');
         return;
       }
 
       if (ignoredUsers.has(lName)) {
         await db.from('ignore_list').delete().eq('user_id', currentUser.id).eq('ignored_username', username);
         ignoredUsers.delete(lName);
-        alert(`You are no longer ignoring ${username}.`);
+        showToast(`You are no longer ignoring ${username}.`);
       } else {
         await db.from('ignore_list').insert({ user_id: currentUser.id, ignored_username: username });
         ignoredUsers.add(lName);
-        alert(`You are now ignoring ${username}. Their posts will be hidden.`);
+        showToast(`You are now ignoring ${username}. Their posts will be hidden.`);
       }
 
       if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) {
         openThread(currentThread.id, currentThreadPage, false);
+      }
+      if (!document.getElementById('viewUserProfile').classList.contains('hidden') && viewedProfileUsername) {
+        openProfile(viewedProfileUsername, false);
       }
     }
 
@@ -1041,7 +1399,7 @@
       if (!textarea) return;
       const newContent = textarea.value.trim();
       if (!newContent) {
-        alert('Post cannot be empty.');
+        showToast('Post cannot be empty.');
         return;
       }
 
@@ -1049,17 +1407,14 @@
       const { error } = await db.from(table).update({ message: newContent }).eq('id', id);
 
       if (error) {
-        alert('Error updating post: ' + error.message);
+        showToast('Error updating post: ' + error.message);
       } else {
         openThread(currentThread.id, currentThreadPage, false);
       }
     }
 
     function toggleProfileEditor(pushHistory = true) {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewInbox', 'viewSearch', 'viewMemberList', 'viewAuthPortal'].forEach(id => {
-        document.getElementById(id).classList.add('hidden');
-      });
-      document.getElementById('viewProfileEditor').classList.remove('hidden');
+      switchView('viewProfileEditor');
       document.getElementById('breadcrumbNav').innerHTML = `
         <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Index</a> &raquo; <b>Edit Profile</b>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
@@ -1138,8 +1493,141 @@
       }
     }
 
+    // MEMBER PROFILE LANDING PAGE
+    async function openProfile(username, pushHistory = true) {
+      if (!currentUser) { showAuthPortal(); return; }
+      if (!username) return;
+
+      viewedProfileUsername = username;
+      switchView('viewUserProfile');
+      await loadProfiles();
+
+      const lName = username.toLowerCase();
+      const profile = userProfiles[lName] || { username: username };
+      const displayUsername = profile.username || username;
+      const myUsername = (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase();
+      const isMe = myUsername === lName;
+      const isUserAdmin = !!profile.is_admin || lName === 'biggie';
+      const isOnline = onlineUsernames.has(lName);
+      const isIgnored = ignoredUsers.has(lName);
+
+      document.getElementById('breadcrumbNav').innerHTML = `
+        <span>
+          <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Forum Index</a> &raquo;
+          <a href="javascript:void(0)" onclick="openMemberList()">Member Directory</a> &raquo;
+          <b>${escapeHtml(displayUsername)}'s Profile</b>
+        </span>
+        <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
+      `;
+
+      if (pushHistory) {
+        history.pushState({ view: 'user_profile', username: displayUsername }, '', `?view=user_profile&user=${encodeURIComponent(displayUsername)}`);
+      }
+
+      const { data: userThreads } = await db
+        .from('messages')
+        .select('id, title, category, created_at')
+        .ilike('username', displayUsername)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      const { data: userReplies } = await db
+        .from('replies')
+        .select('id, thread_id, message, created_at')
+        .ilike('username', displayUsername)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      const postCount = globalPostCounts[lName] || ((userThreads?.length || 0) + (userReplies?.length || 0));
+      const rankData = getUserRankAndTitle(postCount, profile.custom_title);
+      const initialLetter = escapeHtml(displayUsername.charAt(0).toUpperCase());
+
+      const avatarBlock = profile.avatar_url
+        ? `<img src="${escapeHtml(profile.avatar_url)}" alt="${escapeHtml(displayUsername)}'s avatar" class="profile-avatar-lg" />`
+        : `<div class="profile-avatar-placeholder">${initialLetter}</div>`;
+
+      const actionButtons = isMe
+        ? `<button class="primary-btn" onclick="toggleProfileEditor()">Edit My Profile</button>`
+        : `
+          <button class="primary-btn" onclick="openPrivateChat('${escapeHtml(displayUsername)}')">💬 PM / DM ${escapeHtml(displayUsername)}</button>
+          <button onclick="toggleIgnoreUser('${escapeHtml(displayUsername)}')">${isIgnored ? 'Unignore User' : 'Ignore User'}</button>
+        `;
+
+      document.getElementById('userProfileCard').innerHTML = `
+        <div class="profile-card-header">
+          <span>Member Profile: ${escapeHtml(displayUsername)}</span>
+          <span style="font-size:11px; font-weight:normal;">
+            ${isOnline
+              ? `<span class="status-dot status-online"></span>Online Now`
+              : `<span class="status-dot status-offline"></span>Offline`}
+          </span>
+        </div>
+        <div class="profile-card-body">
+          <div class="profile-sidebar">
+            ${avatarBlock}
+            <div class="author-name" style="font-size:14px;">${escapeHtml(displayUsername)}</div>
+            ${isUserAdmin ? '<div class="admin-badge">Site Admin</div>' : `<div class="author-rank">${rankData.rankTitle}</div><div class="author-stars">${rankData.stars}</div>`}
+            <div class="author-stats">Total Posts: <b>${postCount}</b></div>
+          </div>
+          <div class="profile-main">
+            <div class="profile-section-label">Status / Bio</div>
+            <div class="profile-bio-box">${profile.bio ? escapeHtml(profile.bio) : '<span style="color:#7a7267; font-style:italic;">No status or bio set yet.</span>'}</div>
+
+            <div class="profile-section-label">Forum Signature</div>
+            <div class="profile-bio-box">${profile.signature ? formatPostBody(profile.signature) : '<span style="color:#7a7267; font-style:italic;">No signature set.</span>'}</div>
+
+            <div class="profile-actions">
+              ${actionButtons}
+              <button onclick="history.back()">&laquo; Back</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('profileActivityHeader').textContent = `Recent Threads & Replies by ${displayUsername}`;
+      const activityBody = document.getElementById('profileActivityBody');
+
+      const activityRows = [
+        ...(userThreads || []).map(t => ({
+          type: 'Thread',
+          threadId: t.id,
+          label: t.title || 'Untitled Thread',
+          sub: `Board: ${t.category}`,
+          created_at: t.created_at
+        })),
+        ...(userReplies || []).map(r => ({
+          type: 'Reply',
+          threadId: r.thread_id,
+          label: (r.message || '').slice(0, 80) + ((r.message || '').length > 80 ? '...' : ''),
+          sub: `Reply in Thread #${r.thread_id}`,
+          created_at: r.created_at
+        }))
+      ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 12);
+
+      if (activityRows.length === 0) {
+        activityBody.innerHTML = `<div style="padding:14px; text-align:center; color:#7a7267;">No recent posts found for ${escapeHtml(displayUsername)}.</div>`;
+      } else {
+        activityBody.innerHTML = `
+          <table class="forum-table">
+            <tbody>
+              ${activityRows.map((item, idx) => `
+                <tr class="${idx % 2 === 0 ? 'row-odd' : 'row-even'}">
+                  <td style="width:70px; text-align:center;"><b>${item.type}</b></td>
+                  <td>
+                    <a href="javascript:void(0)" onclick="openThread(${item.threadId}, 1)">${escapeHtml(item.label)}</a>
+                    <div class="board-desc">${escapeHtml(item.sub)}</div>
+                  </td>
+                  <td class="last-post-col">${formatDate(item.created_at)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+    }
+
     // BBCode Helpers
-    function insertBBCode(textareaId, tag) {
+    async function insertBBCode(textareaId, tag) {
       const ta = document.getElementById(textareaId);
       const start = ta.selectionStart;
       const end = ta.selectionEnd;
@@ -1148,7 +1636,7 @@
 
       let replacement = '';
       if (tag === 'url') {
-        const url = prompt('Enter URL:', 'https://');
+        const url = await openAppPrompt('Enter URL:', 'https://', 'Insert Link');
         if (!url) return;
         replacement = `[url=${url}]${selected || url}[/url]`;
       } else {
@@ -1158,6 +1646,34 @@
       ta.value = val.substring(0, start) + replacement + val.substring(end);
       ta.focus();
       ta.setSelectionRange(start + replacement.length, start + replacement.length);
+    }
+
+    function quotePost(targetType, id) {
+      const post = allLoadedPosts.find(p => p.targetType === targetType && p.id === id);
+      if (!post) return;
+      const replyTa = document.getElementById('replyBodyInput');
+      const replyBox = document.getElementById('replyFormBox');
+      if (!replyTa || !replyBox || replyBox.classList.contains('hidden')) return;
+
+      const prefix = replyTa.value.trim() ? replyTa.value + '\n\n' : '';
+      replyTa.value = `${prefix}[quote=${post.username}]${post.message}[/quote]\n`;
+      replyBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      replyTa.focus();
+    }
+
+    function respondToPost(targetType, id) {
+      const post = allLoadedPosts.find(p => p.targetType === targetType && p.id === id);
+      if (!post) return;
+      const replyTa = document.getElementById('replyBodyInput');
+      const replyBox = document.getElementById('replyFormBox');
+      if (!replyTa || !replyBox || replyBox.classList.contains('hidden')) return;
+
+      const mention = `@${post.username} `;
+      if (!replyTa.value.includes(mention)) {
+        replyTa.value = replyTa.value.trim() ? `${replyTa.value}\n${mention}` : mention;
+      }
+      replyBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      replyTa.focus();
     }
 
     function quoteLastPost() {
@@ -1186,7 +1702,7 @@
       const stayLoggedIn = document.getElementById('portalStayLoggedIn').checked;
       const status = document.getElementById('authStatus');
 
-      localStorage.setItem('cantaloupe_stay_logged', stayLoggedIn);
+      try { localStorage.setItem('cantaloupe_stay_logged', stayLoggedIn); } catch (e) {}
 
       status.style.color = '#d35400';
       status.textContent = 'Logging in...';
@@ -1198,7 +1714,7 @@
       } else {
         status.textContent = '';
         if (!stayLoggedIn) {
-          sessionStorage.setItem('supabase.auth.token', localStorage.getItem('supabase.auth.token'));
+          try { sessionStorage.setItem('supabase.auth.token', localStorage.getItem('supabase.auth.token')); } catch (e) {}
         }
         window.location.reload();
       }
@@ -1211,7 +1727,7 @@
       const stayLoggedIn = document.getElementById('portalRegStayLoggedIn').checked;
       const status = document.getElementById('authStatus');
 
-      localStorage.setItem('cantaloupe_stay_logged', stayLoggedIn);
+      try { localStorage.setItem('cantaloupe_stay_logged', stayLoggedIn); } catch (e) {}
       status.style.color = '#d35400';
       status.textContent = 'Creating account...';
 
@@ -1261,10 +1777,10 @@
     // Post Reporting & Moderation
     async function reportPost(targetId, targetType) {
       if (!currentUser) {
-        alert('Please log in to report posts.');
+        showToast('Please log in to report posts.');
         return;
       }
-      const reason = prompt('Please enter the reason for reporting this post:', 'Spam / Inappropriate content');
+      const reason = await openAppPrompt('Please enter the reason for reporting this post:', 'Spam / Inappropriate content', 'Report Post');
       if (!reason) return;
 
       const reporter = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
@@ -1276,9 +1792,9 @@
       });
 
       if (error) {
-        alert('Error reporting post: ' + error.message);
+        showToast('Error reporting post: ' + error.message);
       } else {
-        alert('Post reported successfully to moderators.');
+        showToast('Post reported successfully to moderators.');
       }
     }
 
@@ -1289,22 +1805,22 @@
 
     async function deletePostItem(id, type) {
       if (!checkIsAdmin()) {
-        alert('Only administrators can delete posts.');
+        showToast('Only administrators can delete posts.');
         return;
       }
       const confirmMsg = type === 'message' 
         ? 'Are you sure you want to delete this entire thread?' 
         : 'Are you sure you want to delete this reply?';
         
-      if (!confirm(confirmMsg)) return;
+      if (!(await openAppConfirm(confirmMsg, 'Delete Post'))) return;
 
       const table = type === 'message' ? 'messages' : 'replies';
       const { error } = await db.from(table).delete().eq('id', id);
 
       if (error) {
-        alert('Error deleting item: ' + error.message);
+        showToast('Error deleting item: ' + error.message);
       } else {
-        alert('Item deleted successfully.');
+        showToast('Item deleted successfully.');
         if (type === 'message') {
           showIndex();
         } else {
@@ -1315,12 +1831,12 @@
 
     async function toggleThreadLock(threadId, makeLocked) {
       if (!checkIsAdmin()) {
-        alert('Only administrators can lock or unlock threads.');
+        showToast('Only administrators can lock or unlock threads.');
         return;
       }
       const { error } = await db.from('messages').update({ is_locked: makeLocked }).eq('id', threadId);
       if (error) {
-        alert('Error updating lock status: ' + error.message);
+        showToast('Error updating lock status: ' + error.message);
       } else {
         openThread(currentThread.id, currentThreadPage);
       }
@@ -1329,35 +1845,32 @@
     async function toggleAdminPrivilege(username, makeAdmin) {
       const myUsername = currentUser ? (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase() : '';
       if (myUsername !== 'biggie') {
-        alert('Only the primary administrator ("biggie") can promote or demote other admins.');
+        showToast('Only the primary administrator ("biggie") can promote or demote other admins.');
         return;
       }
       if (username.toLowerCase() === 'biggie') {
-        alert('You cannot modify the primary administrator status.');
+        showToast('You cannot modify the primary administrator status.');
         return;
       }
 
       const action = makeAdmin ? `promote ${username} to Administrator` : `revoke administrator privileges from ${username}`;
-      if (!confirm(`Are you sure you want to ${action}?`)) return;
+      if (!(await openAppConfirm(`Are you sure you want to ${action}?`, 'Admin Privileges'))) return;
 
       const { error } = await db.from('profiles').update({ is_admin: makeAdmin }).eq('username', username);
       if (error) {
-        alert('Error updating privilege: ' + error.message);
+        showToast('Error updating privilege: ' + error.message);
       } else {
         await loadProfiles();
-        alert('Admin privileges updated successfully.');
+        showToast('Admin privileges updated successfully.');
         openMemberList();
       }
     }
 
     // Member Directory
     async function openMemberList(pushHistory = true) {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewSearch', 'viewInbox', 'viewAuthPortal'].forEach(id => {
-        document.getElementById(id).classList.add('hidden');
-      });
-      document.getElementById('viewMemberList').classList.remove('hidden');
+      switchView('viewMemberList');
       document.getElementById('breadcrumbNav').innerHTML = `
-        <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>Member Directory</b>
+        <span><a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>Member Directory</b></span>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
@@ -1397,7 +1910,7 @@
 
         return `
           <tr class="${rowClass}">
-            <td><b>${escapeHtml(uname)}</b> ${userIsAdmin ? '<span class="admin-badge">Admin</span>' : ''}</td>
+            <td><a href="javascript:void(0)" onclick="openProfile('${escapeHtml(uname)}')">${escapeHtml(uname)}</a> ${userIsAdmin ? '<span class="admin-badge">Admin</span>' : ''}</td>
             <td>${escapeHtml(rankData.rankTitle)} ${rankData.stars}</td>
             <td class="center-col">${postCount}</td>
             <td>${escapeHtml(p.bio || 'No status message.')}</td>
@@ -1407,7 +1920,7 @@
       }).join('');
     }
 
-    // Direct Messaging Functions
+    // Direct Messaging & Private Chat Functions
     async function updateInboxCount() {
       if (!currentUser) return;
       const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
@@ -1422,16 +1935,15 @@
     }
 
     async function openInbox(pushHistory = true) {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewSearch', 'viewMemberList', 'viewAuthPortal'].forEach(id => {
-        document.getElementById(id).classList.add('hidden');
-      });
-      document.getElementById('viewInbox').classList.remove('hidden');
+      currentChatPartner = null;
+      switchView('viewInbox');
+      document.getElementById('privateChatView').classList.add('hidden');
       document.getElementById('composePMBox').classList.add('hidden');
       document.getElementById('pmMessageView').classList.add('hidden');
       document.getElementById('pmTable').classList.remove('hidden');
 
       document.getElementById('breadcrumbNav').innerHTML = `
-        <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>Private Messages</b>
+        <span><a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>Private Messages</b></span>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
@@ -1463,12 +1975,122 @@
         return `
           <tr class="${rowClass}">
             <td><a href="javascript:void(0)" style="${unreadBold}" onclick="readPM(${pm.id})">${escapeHtml(pm.subject)}</a></td>
-            <td>${isIncoming ? 'From: ' : 'To: '}<b>${escapeHtml(otherUser)}</b></td>
+            <td>${isIncoming ? 'From: ' : 'To: '}<a href="javascript:void(0)" onclick="openProfile('${escapeHtml(otherUser)}')">${escapeHtml(otherUser)}</a></td>
             <td class="last-post-col">${formatDate(pm.created_at)}</td>
-            <td style="text-align:center;"><button onclick="deletePM(${pm.id})">Delete</button></td>
+            <td style="text-align:center; white-space:nowrap;">
+              <button onclick="openPrivateChat('${escapeHtml(otherUser)}')">Chat</button>
+              <button onclick="deletePM(${pm.id})">Delete</button>
+            </td>
           </tr>
         `;
       }).join('');
+    }
+
+    async function openPrivateChat(partnerUsername, pushHistory = true) {
+      if (!currentUser) { showAuthPortal(); return; }
+      if (!partnerUsername) return;
+
+      currentChatPartner = partnerUsername;
+      switchView('viewInbox');
+      document.getElementById('pmTable').classList.add('hidden');
+      document.getElementById('composePMBox').classList.add('hidden');
+      document.getElementById('pmMessageView').classList.add('hidden');
+      document.getElementById('privateChatView').classList.remove('hidden');
+
+      const isOnline = onlineUsernames.has(partnerUsername.toLowerCase());
+      document.getElementById('privateChatTitle').innerHTML = `
+        Private Chat with ${escapeHtml(partnerUsername)}
+        <span style="font-size:10px; font-weight:normal; margin-left:8px;">
+          ${isOnline ? '<span class="status-dot status-online"></span>Online' : '<span class="status-dot status-offline"></span>Offline'}
+        </span>
+      `;
+      document.getElementById('breadcrumbNav').innerHTML = `
+        <span>
+          <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo;
+          <a href="javascript:void(0)" onclick="openInbox()">Private Messages</a> &raquo;
+          <b>Chat with ${escapeHtml(partnerUsername)}</b>
+        </span>
+        <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
+      `;
+
+      if (pushHistory) {
+        history.pushState({ view: 'private_chat', username: partnerUsername }, '', `?view=inbox&chat=${encodeURIComponent(partnerUsername)}`);
+      }
+
+      await loadPrivateChatMessages(partnerUsername);
+      document.getElementById('privateChatInput').focus();
+    }
+
+    async function loadPrivateChatMessages(partnerUsername) {
+      if (!currentUser || !partnerUsername) return;
+      const myUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+
+      const { data: msgs } = await db
+        .from('private_messages')
+        .select('*')
+        .or(`and(sender_username.eq.${myUsername},recipient_username.eq.${partnerUsername}),and(sender_username.eq.${partnerUsername},recipient_username.eq.${myUsername})`)
+        .order('created_at', { ascending: true });
+
+      const container = document.getElementById('privateChatMessages');
+      if (!msgs || msgs.length === 0) {
+        container.innerHTML = `<div style="text-align:center; color:#7a7267; margin:auto;">No messages with ${escapeHtml(partnerUsername)} yet. Say hello below!</div>`;
+        return;
+      }
+
+      const unreadIds = msgs
+        .filter(m => m.recipient_username.toLowerCase() === myUsername.toLowerCase() && !m.read_status)
+        .map(m => m.id);
+
+      if (unreadIds.length > 0) {
+        await db.from('private_messages').update({ read_status: true }).in('id', unreadIds);
+        updateInboxCount();
+      }
+
+      container.innerHTML = msgs.map(m => {
+        const isMe = m.sender_username.toLowerCase() === myUsername.toLowerCase();
+        return `
+          <div class="chat-bubble ${isMe ? 'me' : 'them'}">
+            <div class="chat-meta">
+              <b>${escapeHtml(m.sender_username)}</b>
+              <span>${formatDate(m.created_at)}</span>
+            </div>
+            <div>${formatPostBody(m.message)}</div>
+          </div>
+        `;
+      }).join('');
+
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function sendPrivateChatMessage() {
+      if (!currentUser || !currentChatPartner) return;
+      const input = document.getElementById('privateChatInput');
+      const status = document.getElementById('privateChatStatus');
+      const btn = document.getElementById('sendPrivateChatBtn');
+      const body = input.value.trim();
+
+      if (!body) return;
+
+      const senderUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      btn.disabled = true;
+      status.textContent = '';
+
+      const { error } = await db.from('private_messages').insert({
+        sender_id: currentUser.id,
+        sender_username: senderUsername,
+        recipient_username: currentChatPartner,
+        subject: `Chat with ${senderUsername}`,
+        message: body,
+        read_status: false
+      });
+
+      btn.disabled = false;
+      if (error) {
+        status.textContent = error.message;
+      } else {
+        input.value = '';
+        await loadPrivateChatMessages(currentChatPartner);
+      }
     }
 
     function toggleComposePM() {
@@ -1476,11 +2098,7 @@
     }
 
     function openDirectMessage(recipientUsername) {
-      openInbox();
-      toggleComposePM();
-      document.getElementById('pmRecipientInput').value = recipientUsername;
-      document.getElementById('pmSubjectInput').value = `Direct Message`;
-      document.getElementById('pmBodyInput').focus();
+      openPrivateChat(recipientUsername);
     }
 
     async function sendPM() {
@@ -1524,7 +2142,10 @@
       if (!pm) return;
 
       const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
-      if (pm.recipient_username.toLowerCase() === username.toLowerCase() && !pm.read_status) {
+      const isIncoming = pm.recipient_username.toLowerCase() === username.toLowerCase();
+      currentPmSender = isIncoming ? pm.sender_username : pm.recipient_username;
+
+      if (isIncoming && !pm.read_status) {
         await db.from('private_messages').update({ read_status: true }).eq('id', pmId);
         updateInboxCount();
       }
@@ -1538,8 +2159,12 @@
       document.getElementById('pmViewContent').innerHTML = formatPostBody(pm.message);
     }
 
+    function replyInPrivateChat() {
+      if (currentPmSender) openPrivateChat(currentPmSender);
+    }
+
     async function deletePM(pmId) {
-      if (!confirm('Are you sure you want to delete this message?')) return;
+      if (!(await openAppConfirm('Are you sure you want to delete this message?', 'Delete Message'))) return;
       await db.from('private_messages').delete().eq('id', pmId);
       openInbox();
       updateInboxCount();
@@ -1550,12 +2175,9 @@
       const query = document.getElementById('searchInput').value.trim();
       if (!query) return;
 
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch', 'viewMemberList', 'viewAuthPortal'].forEach(id => {
-        document.getElementById(id).classList.add('hidden');
-      });
-      document.getElementById('viewSearch').classList.remove('hidden');
+      switchView('viewSearch');
       document.getElementById('breadcrumbNav').innerHTML = `
-        <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>Search: ${escapeHtml(query)}</b>
+        <span><a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>Search: ${escapeHtml(query)}</b></span>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
@@ -1576,7 +2198,7 @@
         return `
           <tr class="${rowClass}">
             <td><a href="javascript:void(0)" onclick="openThread(${m.id}, 1)">${escapeHtml(m.title)}</a><div class="board-desc">Category: ${escapeHtml(m.category)}</div></td>
-            <td>${escapeHtml(m.username)}</td>
+            <td><a href="javascript:void(0)" onclick="openProfile('${escapeHtml(m.username)}')">${escapeHtml(m.username)}</a></td>
             <td class="last-post-col">${formatDate(m.created_at)}</td>
           </tr>
         `;
@@ -1585,7 +2207,7 @@
 
     async function castVote(targetId, targetType, voteType) {
       if (!currentUser) {
-        alert('Please log in to vote.');
+        showToast('Please log in to vote.');
         return;
       }
 
@@ -1664,13 +2286,19 @@
       const totalOnline = memberList.length + guestCount;
 
       const formattedMembers = memberList.length > 0
-        ? memberList.map(name => userProfiles[name.toLowerCase()]?.is_admin ? `<b style="color:#c0392b;">${escapeHtml(name)}</b>` : `<b>${escapeHtml(name)}</b>`).join(', ')
+        ? memberList.map(name => userProfiles[name.toLowerCase()]?.is_admin
+            ? `<a href="javascript:void(0)" style="color:#c0392b;" onclick="openProfile('${escapeHtml(name)}')">${escapeHtml(name)}</a>`
+            : `<a href="javascript:void(0)" onclick="openProfile('${escapeHtml(name)}')">${escapeHtml(name)}</a>`).join(', ')
+        : 'None';
+
+      const newestMemberHtml = newestMember !== 'None'
+        ? `<a href="javascript:void(0)" onclick="openProfile('${escapeHtml(newestMember)}')">${escapeHtml(newestMember)}</a>`
         : 'None';
 
       box.innerHTML = `
         There are currently <b>${totalOnline}</b> users online (${memberList.length} members, ${guestCount} guests).<br/>
         <span style="color:#6e655f;">Active Members:</span> ${formattedMembers}<br/><hr style="border:0; border-top:1px dashed #e8ccc0; margin:6px 0;"/>
-        Total posts: <b>${totalPosts}</b> &bull; Total members: <b>${totalMembers}</b> &bull; Newest member: <b>${escapeHtml(newestMember)}</b><br/>
+        Total posts: <b>${totalPosts}</b> &bull; Total members: <b>${totalMembers}</b> &bull; Newest member: ${newestMemberHtml}<br/>
         <span style="font-size:10px; color:#7a7267;">Most users ever online was <b>24</b> on Nov 14, 2026.</span>
       `;
 
@@ -1698,7 +2326,7 @@
       const welcome = document.getElementById('welcomeText');
       if (user) {
         const name = user.user_metadata?.username || user.email.split('@')[0];
-        welcome.innerHTML = `Logged in as: <b>${escapeHtml(name)}</b>`;
+        welcome.innerHTML = `Logged in as: <a href="javascript:void(0)" onclick="openProfile('${escapeHtml(name)}')">${escapeHtml(name)}</a>`;
         updateInboxCount();
         loadIgnoredUsers();
       } else {
@@ -1717,7 +2345,7 @@
     }
 
     async function signOut() {
-      localStorage.removeItem('cantaloupe_stay_logged');
+      try { localStorage.removeItem('cantaloupe_stay_logged'); } catch (e) {}
       await db.auth.signOut();
       currentUser = null;
       updateAuthState(null);
@@ -1725,7 +2353,7 @@
     }
 
     function switchView(viewId) {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch', 'viewMemberList', 'viewAuthPortal'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch', 'viewMemberList', 'viewAuthPortal', 'viewUserProfile'].forEach(id => {
         document.getElementById(id).classList.toggle('hidden', id !== viewId);
       });
     }
@@ -1788,7 +2416,8 @@
 
         if (combined.length > 0) {
           const latest = combined[0];
-          lastText = `<b>${escapeHtml(latest.title || 'Thread')}</b><br/>by ${escapeHtml(latest.user || 'Member')}<br/>${formatDate(latest.time)}`;
+          const uName = latest.user || 'Member';
+          lastText = `<b>${escapeHtml(latest.title || 'Thread')}</b><br/>by <a href="javascript:void(0)" onclick="openProfile('${escapeHtml(uName)}')">${escapeHtml(uName)}</a><br/>${formatDate(latest.time)}`;
         }
 
         const rowClass = idx % 2 === 0 ? 'row-odd' : 'row-even';
@@ -1815,7 +2444,7 @@
       switchView('viewBoard');
       document.getElementById('currentBoardTitle').textContent = boardName;
       document.getElementById('breadcrumbNav').innerHTML = `
-        <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Forum Index</a> &raquo; <b>${escapeHtml(boardName)}</b>
+        <span><a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Forum Index</a> &raquo; <b>${escapeHtml(boardName)}</b></span>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
@@ -1852,11 +2481,12 @@
         const stickyPrefix = t.is_sticky ? '<b style="color:#e67e22;">[Sticky] 📌</b> ' : '';
         const lockedPrefix = t.is_locked ? '<b style="color:#c0392b;">[Locked] 🔒</b> ' : '';
         const stickyBtn = isAdmin ? ` <button style="font-size:9px; padding:1px 4px;" onclick="toggleSticky(${t.id}, ${!t.is_sticky})">${t.is_sticky ? 'Unpin' : 'Pin'}</button>` : '';
+        const authorName = t.username || 'Member';
 
         return `
           <tr class="${rowClass}">
             <td>${lockedPrefix}${stickyPrefix}<a href="javascript:void(0)" onclick="openThread(${t.id}, 1)">${escapeHtml(t.title || 'Untitled Thread')}</a>${stickyBtn}</td>
-            <td>${escapeHtml(t.username || 'Member')}</td>
+            <td><a href="javascript:void(0)" onclick="openProfile('${escapeHtml(authorName)}')">${escapeHtml(authorName)}</a></td>
             <td class="center-col">${replyCount}</td>
             <td class="last-post-col">${formatDate(t.created_at)}</td>
           </tr>
@@ -1955,9 +2585,11 @@
 
       document.getElementById('singleThreadTitle').textContent = thread.title || 'Untitled Thread';
       document.getElementById('breadcrumbNav').innerHTML = `
-        <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Forum Index</a> &raquo; 
-        <a href="javascript:void(0)" onclick="openBoard('${escapeHtml(thread.category)}')">${escapeHtml(thread.category)}</a> &raquo; 
-        <b>${escapeHtml(thread.title || 'Thread')}</b>
+        <span>
+          <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Forum Index</a> &raquo; 
+          <a href="javascript:void(0)" onclick="openBoard('${escapeHtml(thread.category)}')">${escapeHtml(thread.category)}</a> &raquo; 
+          <b>${escapeHtml(thread.title || 'Thread')}</b>
+        </span>
         <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
 
@@ -2029,7 +2661,7 @@
           : '';
 
         const pmBtn = (currentUser && myUsername !== lName)
-          ? ` <button style="font-size:9px; padding:1px 4px;" onclick="openDirectMessage('${escapeHtml(uname)}')">PM</button>`
+          ? ` <button style="font-size:9px; padding:1px 4px;" onclick="openPrivateChat('${escapeHtml(uname)}')">PM</button>`
           : '';
 
         const editBtn = (isAdmin || myUsername === lName)
@@ -2044,12 +2676,21 @@
           ? ` <button style="font-size:9px; padding:1px 4px; background:#e74c3c; color:#fff;" onclick="deletePostItem(${p.id}, '${p.targetType}')">Delete</button>`
           : '';
 
+        const quoteRespondFooter = (currentUser && !thread.is_locked)
+          ? `
+            <div class="post-footer-actions">
+              <button type="button" onclick="quotePost('${p.targetType}', ${p.id})">&ldquo; Quote</button>
+              <button type="button" class="primary-btn" onclick="respondToPost('${p.targetType}', ${p.id})">&#8617; Respond</button>
+            </div>
+          `
+          : '';
+
         if (isIgnored) {
           return `
             <div class="post-box">
               <div class="post-header">
                 <span>Posted: ${formatDate(p.created_at)}</span>
-                <span><b>#${p.globalIndex}</b> &bull; Ignored User: <b>${escapeHtml(uname)}</b> ${ignoreBtn}</span>
+                <span><b>#${p.globalIndex}</b> &bull; Ignored User: <a href="javascript:void(0)" onclick="openProfile('${escapeHtml(uname)}')">${escapeHtml(uname)}</a> ${ignoreBtn}</span>
               </div>
               <div class="ignored-post-notice">You have chosen to ignore posts by ${escapeHtml(uname)}.</div>
             </div>
@@ -2078,7 +2719,7 @@
             <table class="post-body-table">
               <tr>
                 <td class="post-author-cell">
-                  <div class="author-name">${escapeHtml(uname)}</div>
+                  <div class="author-name"><a href="javascript:void(0)" onclick="openProfile('${escapeHtml(uname)}')" title="View ${escapeHtml(uname)}'s profile">${escapeHtml(uname)}</a></div>
                   <span class="status-label user-status-indicator" data-username="${escapeHtml(uname)}">
                     ${isOnline
                       ? `<span class="status-dot status-online"></span><span style="color:#27ae60;">Online</span>`
@@ -2086,7 +2727,7 @@
                     }
                   </span>
                   ${isUserAdmin ? '<div class="admin-badge">Site Admin</div>' : `<div class="author-rank">${rankData.rankTitle}</div><div class="author-stars">${rankData.stars}</div>`}
-                  ${avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(uname)}'s avatar" class="author-avatar" />` : ''}
+                  ${avatarUrl ? `<a href="javascript:void(0)" onclick="openProfile('${escapeHtml(uname)}')" title="View ${escapeHtml(uname)}'s profile"><img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(uname)}'s avatar" class="author-avatar" /></a>` : ''}
                   ${bio ? `<div class="author-bio">"${escapeHtml(bio)}"</div>` : ''}
                   <div class="author-stats">
                     Posts: <b>${postCount}</b>
@@ -2098,6 +2739,7 @@
                 </td>
               </tr>
             </table>
+            ${quoteRespondFooter}
           </div>
         `;
       }).join('');
@@ -2214,5 +2856,20 @@
 
     init();
   </script>
+
+  <div id="appToast" class="app-toast hidden"></div>
+  <div id="appModalOverlay" class="app-modal-overlay hidden">
+    <div class="app-modal-box">
+      <div class="app-modal-header" id="appModalTitle">Notice</div>
+      <div class="app-modal-body">
+        <div id="appModalMessage"></div>
+        <input type="text" id="appModalInput" class="hidden" />
+      </div>
+      <div class="app-modal-actions">
+        <button id="appModalCancelBtn" onclick="closeAppModal(null)">Cancel</button>
+        <button id="appModalOkBtn" class="primary-btn" onclick="submitAppModal()">OK</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
