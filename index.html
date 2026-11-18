@@ -2293,7 +2293,7 @@
       status.textContent = 'Sending password reset link...';
 
       const { error } = await db.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin
+        redirectTo: window.location.origin + window.location.pathname
       });
 
       if (error) {
@@ -2406,6 +2406,7 @@
 
     // Member Directory
     async function openMemberList(pushHistory = true) {
+      if (!currentUser) { showAuthPortal(); return; }
       switchView('viewMemberList');
       document.getElementById('breadcrumbNav').innerHTML = `
         <span><a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>Member Directory</b></span>
@@ -2979,7 +2980,6 @@
       switchView('viewAuthPortal');
       document.getElementById('breadcrumbNav').innerHTML = `
         <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Portal</a>
-        <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
       `;
     }
 
