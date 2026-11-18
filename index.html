@@ -785,6 +785,11 @@
       color: #7a7267;
       margin-top: 2px;
     }
+
+    .post-box.post-highlight {
+      border: 2px solid #e67e22;
+      box-shadow: 0 0 12px rgba(230, 126, 34, 0.35);
+    }
   </style>
 </head>
 <body>
@@ -1397,6 +1402,8 @@
           type: 'vote',
           voteType: v.vote_type,
           id: v.id,
+          targetType: v.target_type,
+          targetId: v.target_id,
           threadId: threadId,
           text: `Someone ${isUp ? 'upvoted' : 'downvoted'} your ${label}`,
           created_at: v.created_at || new Date().toISOString(),
@@ -1454,14 +1461,14 @@
         saveSeenQuoteIds(myUsername, seen);
         n.unread = false;
         renderNotifications();
-        await openThread(n.threadId, 1);
+        await openThread(n.threadId, 1, true, { type: 'reply', id: n.id });
       } else if (n.type === 'vote') {
         const seenVotes = getSeenVoteKeys(myUsername);
         seenVotes.add(n.key);
         saveSeenVoteKeys(myUsername, seenVotes);
         n.unread = false;
         renderNotifications();
-        if (n.threadId) await openThread(n.threadId, 1);
+        if (n.threadId) await openThread(n.threadId, 1, true, { type: n.targetType, id: n.targetId });
       }
     }
 
@@ -1550,7 +1557,7 @@
             const msg = (payload.new.message || '').toLowerCase();
             if (sender !== myUsername && (msg.includes(`[quote=${myUsername}]`) || msg.includes(`@${myUsername}`))) {
               loadNotifications();
-              showToast(`❝ ${payload.new.username} quoted/replied to you! Click to view.`, () => openThread(payload.new.thread_id, 1));
+              showToast(`❝ ${payload.new.username} quoted/replied to you! Click to view.`, () => openThread(payload.new.thread_id, 1, true, { type: 'reply', id: payload.new.id }));
             }
           }
         })
@@ -1568,7 +1575,7 @@
                 const threadId = v.target_type === 'message' ? targetPost.id : targetPost.thread_id;
                 loadNotifications();
                 const label = v.vote_type === 1 ? '▲ Someone upvoted your post!' : '▼ Someone downvoted your post!';
-                showToast(`${label} Click to view.`, () => openThread(threadId, 1));
+                showToast(`${label} Click to view.`, () => openThread(threadId, 1, true, { type: v.target_type, id: v.target_id }));
               }
             }
           }
@@ -2973,7 +2980,7 @@
       return { rankTitle: 'Newbie', stars: '⭐' };
     }
 
-    async function openThread(threadId, page = 1, pushHistory = true) {
+    async function openThread(threadId, page = 1, pushHistory = true, focusPost = null) {
       if (!currentUser) { showAuthPortal(); return; }
       switchView('viewThread');
       await loadProfiles();
@@ -3027,6 +3034,14 @@
         { ...thread, isOP: true, targetType: 'message', globalIndex: 1 },
         ...allReplies.map((r, i) => ({ ...r, isOP: false, targetType: 'reply', globalIndex: i + 2 }))
       ];
+
+      if (focusPost && focusPost.type && focusPost.id != null) {
+        const focusIdx = allLoadedPosts.findIndex(p => p.targetType === focusPost.type && p.id === focusPost.id);
+        if (focusIdx !== -1) {
+          page = Math.floor(focusIdx / POSTS_PER_PAGE) + 1;
+          currentThreadPage = page;
+        }
+      }
 
       const startIndex = (page - 1) * POSTS_PER_PAGE;
       const pagePosts = allLoadedPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
@@ -3089,7 +3104,7 @@
 
         if (isIgnored) {
           return `
-            <div class="post-box">
+            <div class="post-box" id="post-box-${p.targetType}-${p.id}">
               <div class="post-header">
                 <span>Posted: ${formatDate(p.created_at)}</span>
                 <span><b>#${p.globalIndex}</b> &bull; Ignored User: <a href="javascript:void(0)" onclick="openProfile('${escapeHtml(uname)}')">${escapeHtml(uname)}</a> ${ignoreBtn}</span>
@@ -3100,7 +3115,7 @@
         }
 
         return `
-          <div class="post-box">
+          <div class="post-box" id="post-box-${p.targetType}-${p.id}">
             <div class="post-header">
               <span>Posted: ${formatDate(p.created_at)}</span>
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -3156,6 +3171,15 @@
       }
       document.getElementById('threadPaginationTop').innerHTML = paginationHtml;
       document.getElementById('threadPaginationTop').classList.toggle('hidden', totalPages <= 1);
+
+      if (focusPost && focusPost.type && focusPost.id != null) {
+        const targetEl = document.getElementById(`post-box-${focusPost.type}-${focusPost.id}`);
+        if (targetEl) {
+          targetEl.classList.add('post-highlight');
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => targetEl.classList.remove('post-highlight'), 2500);
+        }
+      }
     }
 
     async function postReply() {
