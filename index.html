@@ -2264,7 +2264,7 @@
           <div class="profile-sidebar">
             ${avatarBlock}
             <div class="author-name" style="font-size:14px;">${escapeHtml(displayUsername)}</div>
-            ${isUserAdmin ? '<div class="admin-badge">Site Admin</div>' : `<div class="author-rank">${rankData.rankTitle}</div><div class="author-stars">${rankData.stars}</div>`}
+            ${isUserAdmin ? '<div class="admin-badge">Site Admin</div>' : ''}<div class="author-rank">${rankData.rankTitle}</div><div class="author-stars">${rankData.stars}</div>
             <div class="author-stats">Total Posts: <b>${postCount}</b></div>
           </div>
           <div class="profile-main">
@@ -3617,7 +3617,7 @@
                       : `<span class="status-dot status-offline"></span><span style="color:#7a7267;">Offline</span>`
                     }
                   </span>
-                  ${isUserAdmin ? '<div class="admin-badge">Site Admin</div>' : `<div class="author-rank">${rankData.rankTitle}</div><div class="author-stars">${rankData.stars}</div>`}
+                  ${isUserAdmin ? '<div class="admin-badge">Site Admin</div>' : ''}<div class="author-rank">${rankData.rankTitle}</div><div class="author-stars">${rankData.stars}</div>
                   ${avatarUrl ? `<a href="javascript:void(0)" onclick="openProfile('${escapeHtml(uname)}')" title="View ${escapeHtml(uname)}'s profile"><img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(uname)}'s avatar" class="author-avatar" /></a>` : ''}
                   ${bio ? `<div class="author-bio">"${escapeHtml(bio)}"</div>` : ''}
                   <div class="author-stats">
