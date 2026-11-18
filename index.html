@@ -1608,6 +1608,23 @@
         });
       }
 
+      [
+        ['searchInput', performSearch],
+        ['portalPasswordInput', portalSignIn],
+        ['portalRegPasswordInput', portalSignUp],
+        ['portalForgotEmailInput', portalSendPasswordReset]
+      ].forEach(([elId, handler]) => {
+        const el = document.getElementById(elId);
+        if (el) {
+          el.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handler();
+            }
+          });
+        }
+      });
+
 
       document.addEventListener('click', (e) => {
         const wrapper = document.querySelector('.notif-wrapper');
@@ -2318,8 +2335,15 @@
     }
 
     async function deletePostItem(id, type) {
-      if (!checkIsAdmin()) {
-        showToast('Only administrators can delete posts.');
+      if (!currentUser) {
+        showToast('Please log in to delete posts.');
+        return;
+      }
+      const myUsername = (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase();
+      const targetPost = allLoadedPosts.find(p => p.targetType === type && p.id === id);
+      const isAuthor = targetPost && (targetPost.user_id === currentUser.id || (targetPost.username || '').toLowerCase() === myUsername);
+      if (!checkIsAdmin() && !isAuthor) {
+        showToast('You can only delete your own posts.');
         return;
       }
       const confirmMsg = type === 'message' 
@@ -2725,6 +2749,7 @@
 
     // Search Functionality
     async function performSearch() {
+      if (!currentUser) { showAuthPortal(); return; }
       const query = document.getElementById('searchInput').value.trim();
       if (!query) return;
 
@@ -3448,7 +3473,7 @@
       safe = safe.replace(/\[b\](.*?)\[\/b\]/gis, '<b>$1</b>');
       safe = safe.replace(/\[i\](.*?)\[\/i\]/gis, '<i>$1</i>');
       safe = safe.replace(/\[u\](.*?)\[\/u\]/gis, '<u>$1</u>');
-      safe = safe.replace(/\[url=(.*?)\](.*?)\[\/url\]/gis, '<a href="$1" target="_blank" rel="noopener noreferrer">$2</a>');
+      safe = safe.replace(/\[url=(https?:\/\/[^\]\s"]+)\](.*?)\[\/url\]/gis, '<a href="$1" target="_blank" rel="noopener noreferrer">$2</a>');
       safe = safe.replace(/\[quote=(.*?)D?\](.*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote by $1:</b><br/>$2</div>');
       safe = safe.replace(/\[quote\](.*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote:</b><br/>$1</div>');
 
