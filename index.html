@@ -211,6 +211,7 @@
     .post-body-table {
       width: 100%;
       border-collapse: collapse;
+      table-layout: fixed;
     }
     .post-author-cell {
       width: 160px;
@@ -275,6 +276,7 @@
     .post-content-cell {
       padding: 12px;
       vertical-align: top;
+      text-align: left;
       line-height: 1.45;
       white-space: pre-wrap;
       word-break: break-word;
@@ -649,10 +651,26 @@
     }
 
     @media (max-width: 600px) {
-      .post-author-cell { width: 105px; padding: 8px; }
+      body { padding: 4px; }
+      .post-author-cell { width: 100px; padding: 8px; }
       .author-avatar { width: 64px; height: 64px; }
       .last-post-col { display: none; }
       .profile-sidebar { width: 100%; border-right: none; border-bottom: 1px solid #f3dcd1; }
+      .notif-panel {
+        position: fixed;
+        left: 10px;
+        right: 10px;
+        top: 110px;
+        width: auto;
+        max-width: calc(100vw - 20px);
+        max-height: 60vh;
+      }
+      .app-toast {
+        left: 10px;
+        right: 10px;
+        bottom: 12px;
+        max-width: none;
+      }
     }
 
     /* In-page Toast & Modal */
@@ -793,7 +811,7 @@
       <div id="loggedOutControls" class="hidden" style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
         <span style="font-size:10px; color:#d35400; font-weight:bold;">Use auth portal below &rarr;</span>
       </div>
-      <div id="loggedInControls" class="hidden" style="display:flex; gap:6px; align-items:center;">
+      <div id="loggedInControls" class="hidden" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
         <div class="notif-wrapper">
           <button id="notifBellBtn" class="notif-btn" onclick="toggleNotificationsPanel()">🔔 Alerts (0)</button>
           <div id="notifPanel" class="notif-panel hidden">
@@ -2972,10 +2990,7 @@
                     Posts: <b>${postCount}</b>
                   </div>
                 </td>
-                <td class="post-content-cell" id="post-content-${p.targetType}-${p.id}">
-                  ${formatPostBody(p.message)}
-                  ${signature ? `<div class="post-signature">${formatPostBody(signature)}</div>` : ''}
-                </td>
+                <td class="post-content-cell" id="post-content-${p.targetType}-${p.id}">${formatPostBody(p.message)}${signature ? `<div class="post-signature">${formatPostBody(signature)}</div>` : ''}</td>
               </tr>
             </table>
             ${quoteRespondFooter}
