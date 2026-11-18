@@ -2468,27 +2468,64 @@
         return;
       }
 
-      const { data: existing } = await db
-        .from('votes')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .eq('target_id', targetId)
-        .eq('target_type', targetType)
-        .maybeSingle();
+      const scoreEl = document.getElementById(`vote-score-${targetType}-${targetId}`);
+      const upBtn = document.getElementById(`vote-up-${targetType}-${targetId}`);
+      const downBtn = document.getElementById(`vote-down-${targetType}-${targetId}`);
+      if (upBtn) upBtn.disabled = true;
+      if (downBtn) downBtn.disabled = true;
 
-      if (existing) {
-        if (existing.vote_type === voteType) {
-          await db.from('votes').delete().eq('id', existing.id);
+      try {
+        const { data: existing, error: fetchError } = await db
+          .from('votes')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .eq('target_id', targetId)
+          .eq('target_type', targetType)
+          .maybeSingle();
+
+        if (fetchError) throw fetchError;
+
+        let delta = 0;
+        let newUserVote = 0;
+
+        if (existing) {
+          if (existing.vote_type === voteType) {
+            const { error: delError } = await db.from('votes').delete().eq('id', existing.id);
+            if (delError) throw delError;
+            delta = -voteType;
+            newUserVote = 0;
+          } else {
+            const { error: updError } = await db.from('votes').update({ vote_type: voteType }).eq('id', existing.id);
+            if (updError) throw updError;
+            delta = voteType - existing.vote_type;
+            newUserVote = voteType;
+          }
         } else {
-          await db.from('votes').update({ vote_type: voteType }).eq('id', existing.id);
+          const { error: insError } = await db.from('votes').insert({
+            user_id: currentUser.id,
+            target_id: targetId,
+            target_type: targetType,
+            vote_type: voteType
+          });
+          if (insError) throw insError;
+          delta = voteType;
+          newUserVote = voteType;
         }
-      } else {
-        await db.from('votes').upsert({
-          user_id: currentUser.id,
-          target_id: targetId,
-          target_type: targetType,
-          vote_type: voteType
-        }, { onConflict: 'user_id,target_id,target_type' });
+
+        if (scoreEl) {
+          scoreEl.textContent = String((parseInt(scoreEl.textContent, 10) || 0) + delta);
+        }
+        if (upBtn) upBtn.style.color = newUserVote === 1 ? '#27ae60' : '';
+        if (downBtn) downBtn.style.color = newUserVote === -1 ? '#c0392b' : '';
+
+        if (currentThread) {
+          await openThread(currentThread.id, currentThreadPage, false);
+        }
+      } catch (err) {
+        showToast('Vote failed: ' + (err.message || 'Unknown error'));
+      } finally {
+        if (upBtn) upBtn.disabled = false;
+        if (downBtn) downBtn.disabled = false;
       }
     }
 
@@ -2960,9 +2997,9 @@
               <span>Posted: ${formatDate(p.created_at)}</span>
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                 <div class="vote-box">
-                  <button class="vote-btn" style="${upStyle}" onclick="castVote(${p.id}, '${p.targetType}', 1)">▲</button>
-                  <span class="vote-score">${score}</span>
-                  <button class="vote-btn" style="${downStyle}" onclick="castVote(${p.id}, '${p.targetType}', -1)">▼</button>
+                  <button id="vote-up-${p.targetType}-${p.id}" class="vote-btn" style="${upStyle}" onclick="castVote(${p.id}, '${p.targetType}', 1)">▲</button>
+                  <span id="vote-score-${p.targetType}-${p.id}" class="vote-score">${score}</span>
+                  <button id="vote-down-${p.targetType}-${p.id}" class="vote-btn" style="${downStyle}" onclick="castVote(${p.id}, '${p.targetType}', -1)">▼</button>
                 </div>
                 <button style="font-size:9px; padding:1px 4px;" onclick="reportPost(${p.id}, '${p.targetType}')">Report</button>
                 ${pmBtn}
