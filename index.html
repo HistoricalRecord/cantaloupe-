@@ -1482,6 +1482,7 @@
         .from('private_messages')
         .select('id, sender_username, subject, message, read_status, created_at')
         .ilike('recipient_username', myUsername)
+        .eq('read_status', false)
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -2797,6 +2798,7 @@
       if (unreadIds.length > 0) {
         await db.from('private_messages').update({ read_status: true }).in('id', unreadIds);
         updateInboxCount();
+        loadNotifications();
       }
 
       container.innerHTML = msgs.map(m => {
@@ -2901,6 +2903,7 @@
       if (isIncoming && !pm.read_status) {
         await db.from('private_messages').update({ read_status: true }).eq('id', pmId);
         updateInboxCount();
+        loadNotifications();
       }
 
       document.getElementById('pmTable').classList.add('hidden');
