@@ -920,6 +920,21 @@
       </div>
     </div>
 
+
+    <!-- PASSWORD RECOVERY VIEW -->
+    <div id="viewResetPassword" class="form-box hidden">
+      <div class="form-box-header">Set a New Password</div>
+      <div class="form-box-body">
+        <label for="newPasswordInput"><b>New Password:</b></label>
+        <input type="password" id="newPasswordInput" placeholder="Enter new password" style="width:100%; margin:6px 0 10px 0;" />
+        <label for="confirmNewPasswordInput"><b>Confirm New Password:</b></label>
+        <input type="password" id="confirmNewPasswordInput" placeholder="Confirm new password" style="width:100%; margin:6px 0 10px 0;" />
+        <button class="primary-btn" id="saveNewPasswordBtn" onclick="submitNewPassword()">Update Password</button>
+        <button onclick="navigateHome()">Cancel</button>
+        <div id="resetPasswordStatus" class="status-msg"></div>
+      </div>
+    </div>
+
     <!-- PRIVATE MESSAGING & LIVE CHAT VIEW -->
     <div id="viewInbox" class="hidden">
       <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
@@ -974,9 +989,9 @@
       <table class="forum-table" id="pmTable">
         <thead>
           <tr>
-            <th>Subject</th>
-            <th style="width:150px;">Sender / Recipient</th>
-            <th class="last-post-col">Date</th>
+            <th>Latest Message</th>
+            <th style="width:150px;">Conversation With</th>
+            <th class="last-post-col">Last Activity</th>
             <th style="width:120px; text-align:center;">Action</th>
           </tr>
         </thead>
@@ -1571,9 +1586,16 @@
       const { data: { session } } = await db.auth.getSession();
       updateAuthState(session?.user || null);
 
-      db.auth.onAuthStateChange((_event, session) => {
+      db.auth.onAuthStateChange((event, session) => {
         updateAuthState(session?.user || null);
         trackUserPresence();
+        if (event === 'PASSWORD_RECOVERY') {
+          switchView('viewResetPassword');
+          document.getElementById('breadcrumbNav').innerHTML = `
+            <span><a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>Reset Password</b></span>
+            <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
+          `;
+        }
       });
 
       const chatInput = document.getElementById('privateChatInput');
@@ -1596,6 +1618,15 @@
       });
 
       await loadProfiles();
+      if (currentUser) {
+        const myUname = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+        if (myUname && !userProfiles[myUname.toLowerCase()]) {
+          try {
+            await db.from('profiles').upsert({ username: myUname }, { onConflict: 'username' });
+            await loadProfiles();
+          } catch (e) {}
+        }
+      }
       await loadIgnoredUsers();
       setupPresence();
 
@@ -2184,12 +2215,52 @@
         status.style.color = '#c0392b';
         status.textContent = error.message;
       } else if (data.session) {
+        try {
+          await db.from('profiles').upsert({ username: username }, { onConflict: 'username' });
+        } catch (e) {}
         status.textContent = '';
         updateAuthState(data.session.user);
         window.location.reload();
       } else {
         status.style.color = '#c0392b';
         status.textContent = 'Account created, but automatic sign-in failed. Please log in manually above.';
+      }
+    }
+
+
+    async function submitNewPassword() {
+      const pw1 = document.getElementById('newPasswordInput').value;
+      const pw2 = document.getElementById('confirmNewPasswordInput').value;
+      const status = document.getElementById('resetPasswordStatus');
+      const btn = document.getElementById('saveNewPasswordBtn');
+
+      if (!pw1 || pw1.length < 6) {
+        status.style.color = '#c0392b';
+        status.textContent = 'Password must be at least 6 characters.';
+        return;
+      }
+      if (pw1 !== pw2) {
+        status.style.color = '#c0392b';
+        status.textContent = 'Passwords do not match.';
+        return;
+      }
+
+      btn.disabled = true;
+      status.style.color = '#d35400';
+      status.textContent = 'Updating password...';
+
+      const { error } = await db.auth.updateUser({ password: pw1 });
+      btn.disabled = false;
+      if (error) {
+        status.style.color = '#c0392b';
+        status.textContent = error.message;
+      } else {
+        document.getElementById('newPasswordInput').value = '';
+        document.getElementById('confirmNewPasswordInput').value = '';
+        status.style.color = '#27ae60';
+        status.textContent = 'Password updated! Redirecting...';
+        showToast('Password updated successfully!');
+        setTimeout(() => navigateHome(), 1200);
       }
     }
 
@@ -2409,24 +2480,63 @@
         return;
       }
 
-      tbody.innerHTML = pms.map((pm, idx) => {
+      const convMap = new Map();
+      pms.forEach(pm => {
         const isIncoming = pm.recipient_username.toLowerCase() === username.toLowerCase();
         const otherUser = isIncoming ? pm.sender_username : pm.recipient_username;
-        const unreadBold = (isIncoming && !pm.read_status) ? 'font-weight:bold; color:#d35400;' : '';
+        const key = otherUser.toLowerCase();
+        if (!convMap.has(key)) {
+          convMap.set(key, {
+            otherUser: otherUser,
+            latestPm: pm,
+            isIncoming: isIncoming,
+            unreadCount: (isIncoming && !pm.read_status) ? 1 : 0,
+            totalCount: 1
+          });
+        } else {
+          const entry = convMap.get(key);
+          entry.totalCount += 1;
+          if (isIncoming && !pm.read_status) entry.unreadCount += 1;
+        }
+      });
+
+      const conversations = Array.from(convMap.values());
+      tbody.innerHTML = conversations.map((c, idx) => {
         const rowClass = idx % 2 === 0 ? 'row-odd' : 'row-even';
+        const previewText = (c.latestPm.message || c.latestPm.subject || '').slice(0, 65);
+        const unreadBadge = c.unreadCount > 0
+          ? `<span style="background:#c0392b; color:#fff; font-size:9px; padding:1px 5px; border-radius:3px; margin-right:5px;">${c.unreadCount} New</span>`
+          : '';
+        const previewStyle = c.unreadCount > 0 ? 'font-weight:bold; color:#d35400;' : '';
 
         return `
           <tr class="${rowClass}">
-            <td><a href="javascript:void(0)" style="${unreadBold}" onclick="readPM(${pm.id})">${escapeHtml(pm.subject)}</a></td>
-            <td>${isIncoming ? 'From: ' : 'To: '}<a href="javascript:void(0)" onclick="openProfile('${escapeHtml(otherUser)}')">${escapeHtml(otherUser)}</a></td>
-            <td class="last-post-col">${formatDate(pm.created_at)}</td>
+            <td>
+              ${unreadBadge}<a href="javascript:void(0)" style="${previewStyle}" onclick="openPrivateChat('${escapeHtml(c.otherUser)}')">${escapeHtml(previewText || 'Open Chat')}</a>
+              <div class="board-desc">${c.totalCount} message${c.totalCount === 1 ? '' : 's'}</div>
+            </td>
+            <td><a href="javascript:void(0)" onclick="openProfile('${escapeHtml(c.otherUser)}')">${escapeHtml(c.otherUser)}</a></td>
+            <td class="last-post-col">${formatDate(c.latestPm.created_at)}</td>
             <td style="text-align:center; white-space:nowrap;">
-              <button onclick="openPrivateChat('${escapeHtml(otherUser)}')">Chat</button>
-              <button onclick="deletePM(${pm.id})">Delete</button>
+              <button class="primary-btn" onclick="openPrivateChat('${escapeHtml(c.otherUser)}')">Chat</button>
+              <button onclick="deleteConversation('${escapeHtml(c.otherUser)}')">Delete</button>
             </td>
           </tr>
         `;
       }).join('');
+    }
+
+    async function deleteConversation(otherUser) {
+      if (!currentUser || !otherUser) return;
+      if (!(await openAppConfirm(`Delete your entire conversation with ${otherUser}?`, 'Delete Conversation'))) return;
+      const myUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      await db
+        .from('private_messages')
+        .delete()
+        .or(`and(sender_username.eq.${myUsername},recipient_username.eq.${otherUser}),and(sender_username.eq.${otherUser},recipient_username.eq.${myUsername})`);
+      openInbox();
+      updateInboxCount();
+      loadNotifications();
     }
 
     async function openPrivateChat(partnerUsername, pushHistory = true) {
@@ -2833,7 +2943,7 @@
     }
 
     function switchView(viewId) {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch', 'viewMemberList', 'viewAuthPortal', 'viewUserProfile'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch', 'viewMemberList', 'viewAuthPortal', 'viewUserProfile', 'viewResetPassword'].forEach(id => {
         document.getElementById(id).classList.toggle('hidden', id !== viewId);
       });
     }
@@ -2887,17 +2997,17 @@
 
         let lastText = 'No posts yet';
         const combined = [
-          ...boardThreads.map(t => ({ user: t.username, time: t.created_at, title: t.title })),
+          ...boardThreads.map(t => ({ threadId: t.id, user: t.username, time: t.created_at, title: t.title })),
           ...boardReplies.map(r => {
             const parent = boardThreads.find(t => t.id === r.thread_id);
-            return { user: r.username, time: r.created_at, title: parent ? parent.title : 'Thread' };
+            return { threadId: r.thread_id, user: r.username, time: r.created_at, title: parent ? parent.title : 'Thread' };
           })
         ].sort((a, b) => new Date(b.time) - new Date(a.time));
 
         if (combined.length > 0) {
           const latest = combined[0];
           const uName = latest.user || 'Member';
-          lastText = `<b>${escapeHtml(latest.title || 'Thread')}</b><br/>by <a href="javascript:void(0)" onclick="openProfile('${escapeHtml(uName)}')">${escapeHtml(uName)}</a><br/>${formatDate(latest.time)}`;
+          lastText = `<b><a href="javascript:void(0)" onclick="openThread(${latest.threadId}, 1)">${escapeHtml(latest.title || 'Thread')}</a></b><br/>by <a href="javascript:void(0)" onclick="openProfile('${escapeHtml(uName)}')">${escapeHtml(uName)}</a><br/>${formatDate(latest.time)}`;
         }
 
         const rowClass = idx % 2 === 0 ? 'row-odd' : 'row-even';
@@ -2939,7 +3049,7 @@
         .order('is_sticky', { ascending: false })
         .order('created_at', { ascending: false });
 
-      const { data: replies } = await db.from('replies').select('id, thread_id');
+      const { data: replies } = await db.from('replies').select('id, thread_id, created_at');
       const allReplies = replies || [];
 
       const tbody = document.getElementById('threadListBody');
@@ -2953,9 +3063,23 @@
         return;
       }
 
+      const lastActivityMap = {};
+      threads.forEach(t => { lastActivityMap[t.id] = new Date(t.created_at).getTime(); });
+      allReplies.forEach(r => {
+        const rTime = new Date(r.created_at).getTime();
+        if (!lastActivityMap[r.thread_id] || rTime > lastActivityMap[r.thread_id]) {
+          lastActivityMap[r.thread_id] = rTime;
+        }
+      });
+
+      const sortedThreads = [...threads].sort((a, b) => {
+        if (!!a.is_sticky !== !!b.is_sticky) return a.is_sticky ? -1 : 1;
+        return (lastActivityMap[b.id] || 0) - (lastActivityMap[a.id] || 0);
+      });
+
       const isAdmin = checkIsAdmin();
 
-      tbody.innerHTML = threads.map((t, idx) => {
+      tbody.innerHTML = sortedThreads.map((t, idx) => {
         const replyCount = allReplies.filter(r => r.thread_id === t.id).length;
         const rowClass = t.is_sticky ? 'sticky-row' : (idx % 2 === 0 ? 'row-odd' : 'row-even');
         const stickyPrefix = t.is_sticky ? '<b style="color:#e67e22;">[Sticky] 📌</b> ' : '';
