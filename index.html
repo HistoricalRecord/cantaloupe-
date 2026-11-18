@@ -1275,6 +1275,21 @@
       } catch (e) {}
     }
 
+    function getSeenVoteKeys(username) {
+      try {
+        const raw = localStorage.getItem('cantaloupe_seen_votes_' + username.toLowerCase());
+        return new Set(raw ? JSON.parse(raw) : []);
+      } catch (e) {
+        return new Set();
+      }
+    }
+
+    function saveSeenVoteKeys(username, keySet) {
+      try {
+        localStorage.setItem('cantaloupe_seen_votes_' + username.toLowerCase(), JSON.stringify(Array.from(keySet).slice(-150)));
+      } catch (e) {}
+    }
+
     function toggleNotificationsPanel() {
       const panel = document.getElementById('notifPanel');
       if (panel) panel.classList.toggle('hidden');
@@ -1327,9 +1342,71 @@
           };
         });
 
-      siteNotifications = [...dmNotifs, ...quoteNotifs]
+      const seenVotes = getSeenVoteKeys(myUsername);
+      const { data: myThreads } = await db
+        .from('messages')
+        .select('id, title')
+        .eq('user_id', currentUser.id);
+      const { data: myReplies } = await db
+        .from('replies')
+        .select('id, thread_id')
+        .eq('user_id', currentUser.id);
+
+      const myThreadMap = {};
+      (myThreads || []).forEach(t => { myThreadMap[t.id] = t.title || 'Untitled Thread'; });
+      const myReplyMap = {};
+      (myReplies || []).forEach(r => { myReplyMap[r.id] = r.thread_id; });
+
+      const myThreadIds = Object.keys(myThreadMap).map(Number);
+      const myReplyIds = Object.keys(myReplyMap).map(Number);
+      let voteRows = [];
+
+      if (myThreadIds.length > 0) {
+        const { data: tVotes } = await db
+          .from('votes')
+          .select('id, user_id, target_id, target_type, vote_type, created_at')
+          .eq('target_type', 'message')
+          .in('target_id', myThreadIds)
+          .neq('user_id', currentUser.id)
+          .order('id', { ascending: false })
+          .limit(15);
+        if (tVotes) voteRows = voteRows.concat(tVotes);
+      }
+
+      if (myReplyIds.length > 0) {
+        const { data: rVotes } = await db
+          .from('votes')
+          .select('id, user_id, target_id, target_type, vote_type, created_at')
+          .eq('target_type', 'reply')
+          .in('target_id', myReplyIds)
+          .neq('user_id', currentUser.id)
+          .order('id', { ascending: false })
+          .limit(15);
+        if (rVotes) voteRows = voteRows.concat(rVotes);
+      }
+
+      const voteNotifs = voteRows.map(v => {
+        const isUp = v.vote_type === 1;
+        const threadId = v.target_type === 'message' ? v.target_id : myReplyMap[v.target_id];
+        const label = v.target_type === 'message'
+          ? `thread "${(myThreadMap[v.target_id] || 'Thread').slice(0, 35)}"`
+          : `reply in Thread #${threadId}`;
+        const voteKey = `vote-${v.id}-${v.vote_type}`;
+        return {
+          key: voteKey,
+          type: 'vote',
+          voteType: v.vote_type,
+          id: v.id,
+          threadId: threadId,
+          text: `Someone ${isUp ? 'upvoted' : 'downvoted'} your ${label}`,
+          created_at: v.created_at || new Date().toISOString(),
+          unread: !seenVotes.has(voteKey)
+        };
+      });
+
+      siteNotifications = [...dmNotifs, ...quoteNotifs, ...voteNotifs]
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-        .slice(0, 20);
+        .slice(0, 25);
 
       renderNotifications();
     }
@@ -1348,12 +1425,17 @@
         return;
       }
 
-      body.innerHTML = siteNotifications.map((n, idx) => `
-        <div class="notif-item ${n.unread ? 'unread' : ''}" onclick="handleNotificationClick(${idx})">
-          <div><b>${n.type === 'dm' ? '💬 DM' : '❝ Quote'}</b> &bull; ${escapeHtml(n.text)}</div>
-          <div class="notif-item-meta">${formatDate(n.created_at)}</div>
-        </div>
-      `).join('');
+      body.innerHTML = siteNotifications.map((n, idx) => {
+        const badge = n.type === 'dm'
+          ? '💬 DM'
+          : (n.type === 'quote' ? '❝ Quote' : (n.voteType === 1 ? '▲ Upvote' : '▼ Downvote'));
+        return `
+          <div class="notif-item ${n.unread ? 'unread' : ''}" onclick="handleNotificationClick(${idx})">
+            <div><b>${badge}</b> &bull; ${escapeHtml(n.text)}</div>
+            <div class="notif-item-meta">${formatDate(n.created_at)}</div>
+          </div>
+        `;
+      }).join('');
     }
 
     async function handleNotificationClick(index) {
@@ -1373,6 +1455,13 @@
         n.unread = false;
         renderNotifications();
         await openThread(n.threadId, 1);
+      } else if (n.type === 'vote') {
+        const seenVotes = getSeenVoteKeys(myUsername);
+        seenVotes.add(n.key);
+        saveSeenVoteKeys(myUsername, seenVotes);
+        n.unread = false;
+        renderNotifications();
+        if (n.threadId) await openThread(n.threadId, 1);
       }
     }
 
@@ -1381,11 +1470,14 @@
       const myUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
 
       const seen = getSeenQuoteIds(myUsername);
+      const seenVotes = getSeenVoteKeys(myUsername);
       siteNotifications.forEach(n => {
         if (n.type === 'quote') seen.add(n.id);
+        if (n.type === 'vote') seenVotes.add(n.key);
         n.unread = false;
       });
       saveSeenQuoteIds(myUsername, seen);
+      saveSeenVoteKeys(myUsername, seenVotes);
 
       const unreadDmIds = siteNotifications.filter(n => n.type === 'dm').map(n => n.id);
       if (unreadDmIds.length > 0) {
@@ -1462,8 +1554,24 @@
             }
           }
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => {
-          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage, false);
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, async (payload) => {
+          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) {
+            openThread(currentThread.id, currentThreadPage, false);
+          }
+          if (currentUser && (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && payload.new) {
+            const v = payload.new;
+            if (v.user_id && v.user_id !== currentUser.id) {
+              const table = v.target_type === 'message' ? 'messages' : 'replies';
+              const cols = v.target_type === 'message' ? 'id, user_id' : 'id, user_id, thread_id';
+              const { data: targetPost } = await db.from(table).select(cols).eq('id', v.target_id).maybeSingle();
+              if (targetPost && targetPost.user_id === currentUser.id) {
+                const threadId = v.target_type === 'message' ? targetPost.id : targetPost.thread_id;
+                loadNotifications();
+                const label = v.vote_type === 1 ? '▲ Someone upvoted your post!' : '▼ Someone downvoted your post!';
+                showToast(`${label} Click to view.`, () => openThread(threadId, 1));
+              }
+            }
+          }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async () => {
           await loadProfiles();
