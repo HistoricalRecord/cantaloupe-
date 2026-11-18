@@ -710,6 +710,63 @@
       gap: 6px;
       padding: 0 14px 14px 14px;
     }
+
+    /* In-Site Notification Bell & Panel */
+    .notif-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+    .notif-btn {
+      position: relative;
+    }
+    .notif-btn.has-unread {
+      background: #c0392b;
+      color: #ffffff;
+      border-color: #922b21;
+    }
+    .notif-panel {
+      position: absolute;
+      right: 0;
+      top: 100%;
+      margin-top: 4px;
+      width: 310px;
+      max-height: 360px;
+      overflow-y: auto;
+      background: #ffffff;
+      border: 1px solid #d3a081;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+      z-index: 9500;
+      text-align: left;
+    }
+    .notif-panel-header {
+      background: linear-gradient(180deg, #f39c12 0%, #d35400 100%);
+      color: #ffffff;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .notif-item {
+      padding: 8px 10px;
+      border-bottom: 1px solid #f3dcd1;
+      font-size: 11px;
+      cursor: pointer;
+      background: #ffffff;
+    }
+    .notif-item.unread {
+      background: #fff3e6;
+      border-left: 3px solid #e67e22;
+    }
+    .notif-item:hover {
+      background: #fdebd0;
+    }
+    .notif-item-meta {
+      font-size: 9px;
+      color: #7a7267;
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
@@ -737,6 +794,18 @@
         <span style="font-size:10px; color:#d35400; font-weight:bold;">Use auth portal below &rarr;</span>
       </div>
       <div id="loggedInControls" class="hidden" style="display:flex; gap:6px; align-items:center;">
+        <div class="notif-wrapper">
+          <button id="notifBellBtn" class="notif-btn" onclick="toggleNotificationsPanel()">🔔 Alerts (0)</button>
+          <div id="notifPanel" class="notif-panel hidden">
+            <div class="notif-panel-header">
+              <span>Notifications</span>
+              <button style="font-size:9px; padding:1px 5px;" onclick="markAllNotificationsRead()">Mark All Read</button>
+            </div>
+            <div id="notifListBody">
+              <div style="padding:12px; text-align:center; color:#7a7267;">No notifications yet.</div>
+            </div>
+          </div>
+        </div>
         <button id="inboxBtn" onclick="openInbox()">Inbox (0)</button>
         <button class="primary-btn" onclick="toggleProfileEditor()">Edit Profile</button>
         <button onclick="signOut()">Log Out</button>
@@ -1108,13 +1177,15 @@
     let appModalResolve = null;
     let toastTimer = null;
 
-    function showToast(msg) {
+    function showToast(msg, onClickFn = null) {
       const el = document.getElementById('appToast');
       if (!el) return;
       el.textContent = msg;
+      el.style.cursor = onClickFn ? 'pointer' : 'default';
+      el.onclick = onClickFn ? () => { el.classList.add('hidden'); onClickFn(); } : null;
       el.classList.remove('hidden');
       if (toastTimer) clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => el.classList.add('hidden'), 3200);
+      toastTimer = setTimeout(() => el.classList.add('hidden'), 4500);
     }
 
     function openAppConfirm(message, title = 'Confirm Action') {
@@ -1168,6 +1239,146 @@
     }
 
 
+
+    let siteNotifications = [];
+
+    function getSeenQuoteIds(username) {
+      try {
+        const raw = localStorage.getItem('cantaloupe_seen_quotes_' + username.toLowerCase());
+        return new Set(raw ? JSON.parse(raw) : []);
+      } catch (e) {
+        return new Set();
+      }
+    }
+
+    function saveSeenQuoteIds(username, idSet) {
+      try {
+        localStorage.setItem('cantaloupe_seen_quotes_' + username.toLowerCase(), JSON.stringify(Array.from(idSet).slice(-100)));
+      } catch (e) {}
+    }
+
+    function toggleNotificationsPanel() {
+      const panel = document.getElementById('notifPanel');
+      if (panel) panel.classList.toggle('hidden');
+    }
+
+    async function loadNotifications() {
+      if (!currentUser) return;
+      const myUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      const lName = myUsername.toLowerCase();
+      const seenQuotes = getSeenQuoteIds(myUsername);
+
+      const { data: unreadPms } = await db
+        .from('private_messages')
+        .select('id, sender_username, subject, message, created_at')
+        .ilike('recipient_username', myUsername)
+        .eq('read_status', false)
+        .order('created_at', { ascending: false })
+        .limit(15);
+
+      const { data: quoteReplies } = await db
+        .from('replies')
+        .select('id, thread_id, username, message, created_at')
+        .or(`message.ilike.%[quote=${myUsername}]%,message.ilike.%@${myUsername}%`)
+        .order('created_at', { ascending: false })
+        .limit(15);
+
+      const dmNotifs = (unreadPms || []).map(pm => ({
+        key: 'dm-' + pm.id,
+        type: 'dm',
+        id: pm.id,
+        from: pm.sender_username,
+        text: `New DM from ${pm.sender_username}: "${(pm.message || pm.subject || '').slice(0, 55)}"`,
+        created_at: pm.created_at,
+        unread: true
+      }));
+
+      const quoteNotifs = (quoteReplies || [])
+        .filter(r => (r.username || '').toLowerCase() !== lName)
+        .map(r => {
+          const isQuote = (r.message || '').toLowerCase().includes(`[quote=${lName}]`);
+          return {
+            key: 'quote-' + r.id,
+            type: 'quote',
+            id: r.id,
+            threadId: r.thread_id,
+            from: r.username || 'Member',
+            text: `${r.username || 'Member'} ${isQuote ? 'quoted' : 'replied to'} you in Thread #${r.thread_id}`,
+            created_at: r.created_at,
+            unread: !seenQuotes.has(r.id)
+          };
+        });
+
+      siteNotifications = [...dmNotifs, ...quoteNotifs]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 20);
+
+      renderNotifications();
+    }
+
+    function renderNotifications() {
+      const bell = document.getElementById('notifBellBtn');
+      const body = document.getElementById('notifListBody');
+      if (!bell || !body) return;
+
+      const unreadCount = siteNotifications.filter(n => n.unread).length;
+      bell.textContent = `🔔 Alerts (${unreadCount})`;
+      bell.classList.toggle('has-unread', unreadCount > 0);
+
+      if (siteNotifications.length === 0) {
+        body.innerHTML = `<div style="padding:12px; text-align:center; color:#7a7267;">No notifications yet.</div>`;
+        return;
+      }
+
+      body.innerHTML = siteNotifications.map((n, idx) => `
+        <div class="notif-item ${n.unread ? 'unread' : ''}" onclick="handleNotificationClick(${idx})">
+          <div><b>${n.type === 'dm' ? '💬 DM' : '❝ Quote'}</b> &bull; ${escapeHtml(n.text)}</div>
+          <div class="notif-item-meta">${formatDate(n.created_at)}</div>
+        </div>
+      `).join('');
+    }
+
+    async function handleNotificationClick(index) {
+      const n = siteNotifications[index];
+      if (!n || !currentUser) return;
+      const myUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+
+      document.getElementById('notifPanel').classList.add('hidden');
+
+      if (n.type === 'dm') {
+        await openPrivateChat(n.from);
+        await loadNotifications();
+      } else if (n.type === 'quote') {
+        const seen = getSeenQuoteIds(myUsername);
+        seen.add(n.id);
+        saveSeenQuoteIds(myUsername, seen);
+        n.unread = false;
+        renderNotifications();
+        await openThread(n.threadId, 1);
+      }
+    }
+
+    async function markAllNotificationsRead() {
+      if (!currentUser) return;
+      const myUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+
+      const seen = getSeenQuoteIds(myUsername);
+      siteNotifications.forEach(n => {
+        if (n.type === 'quote') seen.add(n.id);
+        n.unread = false;
+      });
+      saveSeenQuoteIds(myUsername, seen);
+
+      const unreadDmIds = siteNotifications.filter(n => n.type === 'dm').map(n => n.id);
+      if (unreadDmIds.length > 0) {
+        await db.from('private_messages').update({ read_status: true }).in('id', unreadDmIds);
+        updateInboxCount();
+      }
+
+      renderNotifications();
+      document.getElementById('notifPanel').classList.add('hidden');
+    }
+
     async function init() {
       const { data: { session } } = await db.auth.getSession();
       updateAuthState(session?.user || null);
@@ -1187,6 +1398,15 @@
         });
       }
 
+
+      document.addEventListener('click', (e) => {
+        const wrapper = document.querySelector('.notif-wrapper');
+        const panel = document.getElementById('notifPanel');
+        if (wrapper && panel && !wrapper.contains(e.target)) {
+          panel.classList.add('hidden');
+        }
+      });
+
       await loadProfiles();
       await loadIgnoredUsers();
       setupPresence();
@@ -1199,6 +1419,7 @@
       if (currentUser) {
         await handleInitialRoute();
         updateInboxCount();
+        loadNotifications();
       } else {
         showAuthPortal();
       }
@@ -1213,6 +1434,15 @@
           if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread && payload.new?.thread_id === currentThread.id) {
             openThread(currentThread.id, currentThreadPage, false);
           }
+          if (currentUser && payload.eventType === 'INSERT' && payload.new) {
+            const myUsername = (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase();
+            const sender = (payload.new.username || '').toLowerCase();
+            const msg = (payload.new.message || '').toLowerCase();
+            if (sender !== myUsername && (msg.includes(`[quote=${myUsername}]`) || msg.includes(`@${myUsername}`))) {
+              loadNotifications();
+              showToast(`❝ ${payload.new.username} quoted/replied to you! Click to view.`, () => openThread(payload.new.thread_id, 1));
+            }
+          }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => {
           if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage, false);
@@ -1222,8 +1452,17 @@
           if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage, false);
           if (!document.getElementById('viewUserProfile').classList.contains('hidden') && viewedProfileUsername) openProfile(viewedProfileUsername, false);
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'private_messages' }, () => {
-          if (currentUser) updateInboxCount();
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'private_messages' }, (payload) => {
+          if (currentUser) {
+            updateInboxCount();
+            loadNotifications();
+            if (payload.eventType === 'INSERT' && payload.new) {
+              const myUsername = (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase();
+              if ((payload.new.recipient_username || '').toLowerCase() === myUsername) {
+                showToast(`💬 New DM from ${payload.new.sender_username}! Click to chat.`, () => openPrivateChat(payload.new.sender_username));
+              }
+            }
+          }
           if (!document.getElementById('viewInbox').classList.contains('hidden')) {
             if (currentChatPartner && !document.getElementById('privateChatView').classList.contains('hidden')) {
               loadPrivateChatMessages(currentChatPartner);
