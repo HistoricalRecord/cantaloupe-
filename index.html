@@ -772,6 +772,25 @@
       font-size: 11px;
       cursor: pointer;
       background: #ffffff;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .notif-item-content {
+      flex: 1;
+      min-width: 0;
+    }
+    .notif-del-btn {
+      font-size: 10px;
+      padding: 1px 5px;
+      background: #fff;
+      border: 1px solid #d3a081;
+      color: #c0392b;
+      flex-shrink: 0;
+    }
+    .notif-del-btn:hover {
+      background: #fadbd8;
     }
     .notif-item.unread {
       background: #fff3e6;
@@ -822,7 +841,10 @@
           <div id="notifPanel" class="notif-panel hidden">
             <div class="notif-panel-header">
               <span>Notifications</span>
-              <button style="font-size:9px; padding:1px 5px;" onclick="markAllNotificationsRead()">Mark All Read</button>
+              <div style="display:flex; gap:4px;">
+                <button style="font-size:9px; padding:1px 5px;" onclick="markAllNotificationsRead()">Mark All Read</button>
+                <button style="font-size:9px; padding:1px 5px;" onclick="clearAllNotifications()">Clear All</button>
+              </div>
             </div>
             <div id="notifListBody">
               <div style="padding:12px; text-align:center; color:#7a7267;">No notifications yet.</div>
@@ -1291,7 +1313,22 @@
 
     function saveSeenVoteKeys(username, keySet) {
       try {
-        localStorage.setItem('cantaloupe_seen_votes_' + username.toLowerCase(), JSON.stringify(Array.from(keySet).slice(-150)));
+        localStorage.setItem('cantaloupe_seen_votes_' + username.toLowerCase(), JSON.stringify(Array.from(keySet).slice(-300)));
+      } catch (e) {}
+    }
+
+    function getDeletedNotifKeys(username) {
+      try {
+        const raw = localStorage.getItem('cantaloupe_deleted_notifs_' + username.toLowerCase());
+        return new Set(raw ? JSON.parse(raw) : []);
+      } catch (e) {
+        return new Set();
+      }
+    }
+
+    function saveDeletedNotifKeys(username, keySet) {
+      try {
+        localStorage.setItem('cantaloupe_deleted_notifs_' + username.toLowerCase(), JSON.stringify(Array.from(keySet).slice(-500)));
       } catch (e) {}
     }
 
@@ -1306,29 +1343,30 @@
       const lName = myUsername.toLowerCase();
       const seenQuotes = getSeenQuoteIds(myUsername);
 
-      const { data: unreadPms } = await db
+      const deletedNotifs = getDeletedNotifKeys(myUsername);
+
+      const { data: allPms } = await db
         .from('private_messages')
-        .select('id, sender_username, subject, message, created_at')
+        .select('id, sender_username, subject, message, read_status, created_at')
         .ilike('recipient_username', myUsername)
-        .eq('read_status', false)
         .order('created_at', { ascending: false })
-        .limit(15);
+        .limit(50);
 
       const { data: quoteReplies } = await db
         .from('replies')
         .select('id, thread_id, username, message, created_at')
         .or(`message.ilike.%[quote=${myUsername}]%,message.ilike.%@${myUsername}%`)
         .order('created_at', { ascending: false })
-        .limit(15);
+        .limit(50);
 
-      const dmNotifs = (unreadPms || []).map(pm => ({
+      const dmNotifs = (allPms || []).map(pm => ({
         key: 'dm-' + pm.id,
         type: 'dm',
         id: pm.id,
         from: pm.sender_username,
-        text: `New DM from ${pm.sender_username}: "${(pm.message || pm.subject || '').slice(0, 55)}"`,
+        text: `DM from ${pm.sender_username}: "${(pm.message || pm.subject || '').slice(0, 55)}"`,
         created_at: pm.created_at,
-        unread: true
+        unread: !pm.read_status
       }));
 
       const quoteNotifs = (quoteReplies || [])
@@ -1374,7 +1412,7 @@
           .in('target_id', myThreadIds)
           .neq('user_id', currentUser.id)
           .order('id', { ascending: false })
-          .limit(15);
+          .limit(50);
         if (tVotes) voteRows = voteRows.concat(tVotes);
       }
 
@@ -1386,7 +1424,7 @@
           .in('target_id', myReplyIds)
           .neq('user_id', currentUser.id)
           .order('id', { ascending: false })
-          .limit(15);
+          .limit(50);
         if (rVotes) voteRows = voteRows.concat(rVotes);
       }
 
@@ -1412,8 +1450,9 @@
       });
 
       siteNotifications = [...dmNotifs, ...quoteNotifs, ...voteNotifs]
+        .filter(n => !deletedNotifs.has(n.key))
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-        .slice(0, 25);
+        .slice(0, 60);
 
       renderNotifications();
     }
@@ -1438,8 +1477,11 @@
           : (n.type === 'quote' ? '❝ Quote' : (n.voteType === 1 ? '▲ Upvote' : '▼ Downvote'));
         return `
           <div class="notif-item ${n.unread ? 'unread' : ''}" onclick="handleNotificationClick(${idx})">
-            <div><b>${badge}</b> &bull; ${escapeHtml(n.text)}</div>
-            <div class="notif-item-meta">${formatDate(n.created_at)}</div>
+            <div class="notif-item-content">
+              <div><b>${badge}</b> &bull; ${escapeHtml(n.text)}</div>
+              <div class="notif-item-meta">${formatDate(n.created_at)}</div>
+            </div>
+            <button type="button" class="notif-del-btn" title="Delete notification" onclick="deleteNotification(event, ${idx})">&times;</button>
           </div>
         `;
       }).join('');
@@ -1470,6 +1512,35 @@
         renderNotifications();
         if (n.threadId) await openThread(n.threadId, 1, true, { type: n.targetType, id: n.targetId });
       }
+    }
+
+    function deleteNotification(event, index) {
+      if (event) event.stopPropagation();
+      const n = siteNotifications[index];
+      if (!n || !currentUser) return;
+      const myUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      const deleted = getDeletedNotifKeys(myUsername);
+      deleted.add(n.key);
+      saveDeletedNotifKeys(myUsername, deleted);
+      siteNotifications.splice(index, 1);
+      renderNotifications();
+    }
+
+    async function clearAllNotifications() {
+      if (!currentUser || siteNotifications.length === 0) return;
+      const myUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      const deleted = getDeletedNotifKeys(myUsername);
+      siteNotifications.forEach(n => deleted.add(n.key));
+      saveDeletedNotifKeys(myUsername, deleted);
+
+      const unreadDmIds = siteNotifications.filter(n => n.type === 'dm' && n.unread).map(n => n.id);
+      if (unreadDmIds.length > 0) {
+        await db.from('private_messages').update({ read_status: true }).in('id', unreadDmIds);
+        updateInboxCount();
+      }
+
+      siteNotifications = [];
+      renderNotifications();
     }
 
     async function markAllNotificationsRead() {
