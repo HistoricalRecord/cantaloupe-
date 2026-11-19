@@ -1122,6 +1122,76 @@
     body.dark-mode .poll-bar-bg {
       background: #382e26;
     }
+
+    /* Spoiler Tag */
+    .bbcode-spoiler {
+      background: #2d2a26;
+      color: transparent;
+      border-radius: 3px;
+      padding: 1px 6px;
+      cursor: pointer;
+      user-select: none;
+      display: inline-block;
+    }
+    .bbcode-spoiler.revealed {
+      background: #fdebd0;
+      color: #2d2a26;
+      user-select: text;
+    }
+    body.dark-mode .bbcode-spoiler {
+      background: #0f0e0d;
+      color: transparent;
+    }
+    body.dark-mode .bbcode-spoiler.revealed {
+      background: #3d3128;
+      color: #efe7de;
+    }
+
+    /* Post Preview Box */
+    .post-preview-box {
+      margin: 8px 0;
+      padding: 10px;
+      border: 1px dashed #e67e22;
+      background: #ffffff;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.45;
+    }
+    body.dark-mode .post-preview-box {
+      background: #221e1b;
+      border-color: #b8651b;
+    }
+
+    /* Live Shoutbox */
+    .shoutbox-messages {
+      max-height: 180px;
+      overflow-y: auto;
+      padding: 8px 10px;
+      background: #ffffff;
+      border-bottom: 1px solid #f3dcd1;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+    body.dark-mode .shoutbox-messages {
+      background: #1b1815;
+      border-color: #4a3b30;
+    }
+    .shout-row {
+      padding: 2px 0;
+      border-bottom: 1px dashed #f3dcd1;
+    }
+    body.dark-mode .shout-row {
+      border-color: #382e26;
+    }
+    .shout-input-row {
+      display: flex;
+      gap: 6px;
+      padding: 8px 10px;
+      background: #fff9f2;
+    }
+    body.dark-mode .shout-input-row {
+      background: #2a2521;
+    }
   </style>
 </head>
 <body>
@@ -1433,6 +1503,19 @@
         <div class="stats-body" id="adminReportsBody">Loading reports...</div>
       </div>
 
+      <!-- Live Shoutbox -->
+      <div class="stats-box" id="shoutboxSection">
+        <div class="stats-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>💬 Live Shoutbox</span>
+          <button id="clearShoutboxBtn" class="hidden" type="button" onclick="clearShoutbox()" style="font-size:9px; padding:1px 6px;">Clear</button>
+        </div>
+        <div id="shoutboxMessages" class="shoutbox-messages">Loading shouts...</div>
+        <div class="shout-input-row">
+          <input type="text" id="shoutInput" placeholder="Say something in the shoutbox..." maxlength="240" style="flex:1;" />
+          <button type="button" class="primary-btn" onclick="sendShout()">Shout</button>
+        </div>
+      </div>
+
       <!-- Who's Online & Board Stats Box -->
       <div class="stats-box">
         <div class="stats-header">Who's Online & Board Statistics</div>
@@ -1459,6 +1542,7 @@
             <button type="button" onclick="insertBBCode('threadBodyInput', 'url')">URL</button>
             <button type="button" onclick="insertBBCode('threadBodyInput', 'quote')">Quote</button>
             <button type="button" onclick="insertBBCode('threadBodyInput', 'embed')">Embed</button>
+            <button type="button" onclick="insertBBCode('threadBodyInput', 'spoiler')">Spoiler</button>
           </div>
           <textarea id="threadBodyInput" rows="5" placeholder="Enter your message here..."></textarea>
           <div class="file-upload-row">
@@ -1472,7 +1556,9 @@
               <textarea id="pollOptionsInput" rows="3" placeholder="Poll options (one per line, 2 to 8 options)"></textarea>
             </div>
           </div>
+          <div id="threadPreviewBox" class="post-preview-box hidden"></div>
           <button class="primary-btn" id="submitThreadBtn" onclick="createThread()">Submit New Thread</button>
+          <button type="button" onclick="togglePostPreview('threadBodyInput', 'threadPreviewBox')">Preview</button>
           <button onclick="toggleNewThreadForm()">Cancel</button>
           <div id="threadStatus" class="status-msg"></div>
         </div>
@@ -1525,13 +1611,16 @@
             <button type="button" onclick="insertBBCode('replyBodyInput', 'url')">URL</button>
             <button type="button" onclick="insertBBCode('replyBodyInput', 'quote')">Quote</button>
             <button type="button" onclick="insertBBCode('replyBodyInput', 'embed')">Embed</button>
+            <button type="button" onclick="insertBBCode('replyBodyInput', 'spoiler')">Spoiler</button>
           </div>
           <textarea id="replyBodyInput" rows="4" placeholder="Write your reply to this thread..."></textarea>
           <div class="file-upload-row">
             <label for="replyImageInput"><b>Attach Media (Images/Videos, Multiple):</b></label>
             <input type="file" id="replyImageInput" accept="image/*,video/*" multiple />
           </div>
+          <div id="replyPreviewBox" class="post-preview-box hidden"></div>
           <button class="primary-btn" id="submitReplyBtn" onclick="postReply()">Post Reply</button>
+          <button type="button" onclick="togglePostPreview('replyBodyInput', 'replyPreviewBox')">Preview</button>
           <button onclick="quoteLastPost()" type="button">Quote Last Post</button>
           <div id="replyStatus" class="status-msg"></div>
         </div>
@@ -2063,7 +2152,8 @@
         ['searchInput', performSearch],
         ['portalPasswordInput', portalSignIn],
         ['portalRegPasswordInput', portalSignUp],
-        ['portalForgotEmailInput', portalSendPasswordReset]
+        ['portalForgotEmailInput', portalSendPasswordReset],
+        ['shoutInput', sendShout]
       ].forEach(([elId, handler]) => {
         const el = document.getElementById(elId);
         if (el) {
@@ -2198,6 +2288,9 @@
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'post_reactions' }, () => {
           if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage, false);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'shoutbox' }, () => {
+          if (!document.getElementById('viewIndex').classList.contains('hidden')) loadShoutbox();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, () => {
           if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage, false);
@@ -2371,6 +2464,7 @@
           <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'url')">URL</button>
           <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'quote')">Quote</button>
           <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'embed')">Embed</button>
+          <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'spoiler')">Spoiler</button>
         </div>
         <textarea id="editText-${targetType}-${id}" rows="4" style="width:100%; margin-bottom:6px;">${escapeHtml(currentMessage)}</textarea>
         <div style="display:flex; gap:6px;">
@@ -3149,7 +3243,13 @@
         return;
       }
 
-      tbody.innerHTML = profiles.map((p, idx) => {
+      const sortedProfiles = [...profiles].sort((a, b) => {
+        const ca = globalPostCounts[(a.username || '').toLowerCase()] || 0;
+        const cb = globalPostCounts[(b.username || '').toLowerCase()] || 0;
+        return cb - ca;
+      });
+
+      tbody.innerHTML = sortedProfiles.map((p, idx) => {
         const uname = p.username || 'Member';
         const postCount = globalPostCounts[uname.toLowerCase()] || 0;
         const rankData = getUserRankAndTitle(postCount, p.custom_title);
@@ -3675,6 +3775,16 @@
         There are currently <b>${totalOnline}</b> users online (${memberList.length} members, ${guestCount} guests).<br/>
         <span style="color:#6e655f;">Active Members:</span> ${formattedMembers}<br/><hr style="border:0; border-top:1px dashed #e8ccc0; margin:6px 0;"/>
         Total posts: <b>${totalPosts}</b> &bull; Total members: <b>${totalMembers}</b> &bull; Newest member: ${newestMemberHtml}<br/>
+        <span style="color:#6e655f;">Top Posters:</span> ${
+          Object.entries(globalPostCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([lKey, cnt], i) => {
+              const disp = userProfiles[lKey]?.username || lKey;
+              const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : '🥉');
+              return `${medal} <a href="javascript:void(0)" onclick="openProfile('${escapeHtml(disp)}')">${escapeHtml(disp)}</a> (${cnt})`;
+            }).join(' &bull; ') || 'None'
+        }<br/>
         <span style="font-size:10px; color:#7a7267;">Most users ever online was <b>24</b> on Nov 14, 2026.</span>
       `;
 
@@ -3810,6 +3920,7 @@
       }).join('');
 
       updateForumStatsUI(Array.from(onlineUsernames), onlineGuestsCount);
+      loadShoutbox();
     }
 
     async function openBoard(boardName, pushHistory = true, boardPage = 1) {
@@ -3999,6 +4110,84 @@
       } catch (err) {
         showToast('Reaction error: ' + (err.message || 'Check Supabase post_reactions table'));
       }
+    }
+
+
+    function togglePostPreview(textareaId, previewBoxId) {
+      const ta = document.getElementById(textareaId);
+      const box = document.getElementById(previewBoxId);
+      if (!ta || !box) return;
+      if (!box.classList.contains('hidden')) {
+        box.classList.add('hidden');
+        return;
+      }
+      const raw = ta.value.trim();
+      box.innerHTML = raw
+        ? `<div style="font-size:10px; font-weight:bold; color:#d35400; margin-bottom:6px;">Post Preview:</div>${formatPostBody(raw)}`
+        : '<span style="color:#7a7267; font-style:italic;">Nothing to preview yet.</span>';
+      box.classList.remove('hidden');
+    }
+
+    async function loadShoutbox() {
+      const box = document.getElementById('shoutboxMessages');
+      const clearBtn = document.getElementById('clearShoutboxBtn');
+      if (!box) return;
+      if (clearBtn) clearBtn.classList.toggle('hidden', !checkIsAdmin());
+
+      try {
+        const { data: shouts, error } = await db
+          .from('shoutbox')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(25);
+
+        if (error) throw error;
+        if (!shouts || shouts.length === 0) {
+          box.innerHTML = '<div style="color:#7a7267; text-align:center; padding:10px;">No shouts yet. Say hi!</div>';
+          return;
+        }
+        box.innerHTML = [...shouts].reverse().map(sh => `
+          <div class="shout-row">
+            <span style="font-size:9px; color:#7a7267;">[${new Date(sh.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}]</span>
+            <a href="javascript:void(0)" onclick="openProfile('${escapeHtml(sh.username)}')">${escapeHtml(sh.username)}</a>:
+            <span>${escapeHtml(sh.message)}</span>
+          </div>
+        `).join('');
+        box.scrollTop = box.scrollHeight;
+      } catch (e) {
+        box.innerHTML = '<div style="color:#7a7267; font-size:10px; padding:6px;">Shoutbox unavailable until the Supabase <code>shoutbox</code> table is created.</div>';
+      }
+    }
+
+    async function sendShout() {
+      if (!currentUser) {
+        showToast('Please log in to shout.');
+        return;
+      }
+      const inp = document.getElementById('shoutInput');
+      if (!inp) return;
+      const msg = inp.value.trim();
+      if (!msg) return;
+
+      const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      const { error } = await db.from('shoutbox').insert({
+        user_id: currentUser.id,
+        username: username,
+        message: msg
+      });
+      if (error) {
+        showToast('Shout failed: ' + error.message);
+      } else {
+        inp.value = '';
+        loadShoutbox();
+      }
+    }
+
+    async function clearShoutbox() {
+      if (!checkIsAdmin()) return;
+      if (!(await openAppConfirm('Clear all messages in the Shoutbox?', 'Clear Shoutbox'))) return;
+      await db.from('shoutbox').delete().gt('id', 0);
+      loadShoutbox();
     }
 
     function toggleNewThreadForm() {
@@ -4501,6 +4690,7 @@
       safe = safe.replace(/\[b\](.*?)\[\/b\]/gis, '<b>$1</b>');
       safe = safe.replace(/\[i\](.*?)\[\/i\]/gis, '<i>$1</i>');
       safe = safe.replace(/\[u\](.*?)\[\/u\]/gis, '<u>$1</u>');
+      safe = safe.replace(/\[spoiler\](.*?)\[\/spoiler\]/gis, '<span class="bbcode-spoiler" onclick="this.classList.toggle(\'revealed\')" title="Click to reveal spoiler">$1</span>');
       safe = safe.replace(/\[url=(https?:\/\/[^\]\s"]+)\](.*?)\[\/url\]/gis, (m, url, label) => {
         return hold(`<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`);
       });
