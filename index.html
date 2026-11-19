@@ -653,11 +653,17 @@
     @media (max-width: 600px) {
       body { padding: 4px; }
       .post-box { margin: 8px 4px; }
-      .post-body-table, .post-body-table tbody, .post-body-table tr, .post-body-table td {
+      .post-author-cell { width: 105px; padding: 8px; }
+      .author-avatar { width: 64px; height: 64px; }
+      .post-content-cell { padding: 10px; }
+      .post-box.has-video-embed .post-body-table,
+      .post-box.has-video-embed .post-body-table tbody,
+      .post-box.has-video-embed .post-body-table tr,
+      .post-box.has-video-embed .post-body-table td {
         display: block;
         width: 100% !important;
       }
-      .post-author-cell {
+      .post-box.has-video-embed .post-author-cell {
         width: 100% !important;
         border-right: none;
         border-bottom: 1px solid #f3dcd1;
@@ -667,9 +673,8 @@
         align-items: center;
         gap: 8px;
       }
-      .author-avatar { width: 44px; height: 44px; margin: 0; }
-      .author-bio { width: 100%; margin-bottom: 2px; padding-bottom: 4px; }
-      .post-content-cell { padding: 10px; }
+      .post-box.has-video-embed .author-avatar { width: 44px; height: 44px; margin: 0; }
+      .post-box.has-video-embed .author-bio { width: 100%; margin-bottom: 2px; padding-bottom: 4px; }
       .last-post-col { display: none; }
       .profile-sidebar { width: 100%; border-right: none; border-bottom: 1px solid #f3dcd1; }
       .notif-panel {
@@ -3984,8 +3989,11 @@
           `;
         }
 
+        const formattedBody = formatPostBody(p.message);
+        const hasVideoEmbed = formattedBody.includes('post-embed-wrap') || formattedBody.includes('post-embedded-video');
+
         return `
-          <div class="post-box" id="post-box-${p.targetType}-${p.id}">
+          <div class="post-box${hasVideoEmbed ? ' has-video-embed' : ''}" id="post-box-${p.targetType}-${p.id}">
             <div class="post-header">
               <span>Posted: ${formatDate(p.created_at)}</span>
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -4020,7 +4028,7 @@
                     Posts: <b>${postCount}</b>
                   </div>
                 </td>
-                <td class="post-content-cell" id="post-content-${p.targetType}-${p.id}">${formatPostBody(p.message)}${signature ? `<div class="post-signature">${formatPostBody(signature)}</div>` : ''}</td>
+                <td class="post-content-cell" id="post-content-${p.targetType}-${p.id}">${formattedBody}${signature ? `<div class="post-signature">${formatPostBody(signature)}</div>` : ''}</td>
               </tr>
             </table>
             ${quoteRespondFooter}
