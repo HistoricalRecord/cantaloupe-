@@ -2227,8 +2227,8 @@
 
       const uploadedUrls = [];
       for (const file of files) {
-        if (file.size > 60 * 1024 * 1024) {
-          throw new Error(`File ${file.name} is larger than 60MB.`);
+        if (file.size > 500 * 1024 * 1024) {
+          throw new Error(`File ${file.name} is larger than 500MB.`);
         }
         const ext = file.name.split('.').pop() || 'png';
         const fileName = `${folder}/${currentUser.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
