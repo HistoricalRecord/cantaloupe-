@@ -74,8 +74,17 @@
     }
     .banner-search {
       display: flex;
+      flex-wrap: wrap;
       gap: 4px;
       align-items: center;
+      max-width: 100%;
+    }
+    .banner-search button {
+      white-space: nowrap;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     /* Sub-header / User Bar */
@@ -652,6 +661,8 @@
 
     @media (max-width: 600px) {
       body { padding: 4px; }
+      .banner-search { width: 100%; }
+      .banner-search input { flex: 1 1 110px; min-width: 90px; width: auto !important; }
       .post-box { margin: 8px 4px; }
       .post-author-cell { width: 105px; padding: 8px; }
       .author-avatar { width: 64px; height: 64px; }
@@ -1700,7 +1711,8 @@
       { name: 'Pro Wrestling', desc: 'WWE, AEW, NJPW, indies, rumors, and classic wrestling talk.' },
       { name: 'Sports', desc: 'NFL, NBA, MLB, NHL, college sports, fantasy, and live game threads.' },
       { name: 'Technology/Social Media/AI', desc: 'Gadgets, internet culture, apps, coding, and artificial intelligence.' },
-      { name: 'World Events/News/Politics', desc: 'Breaking headlines, current affairs, history, and political debate.' }
+      { name: 'World Events/News/Politics', desc: 'Breaking headlines, current affairs, history, and political debate.' },
+      { name: 'NSFW / 18+ After Dark', desc: 'Mature 18+ discussion. Adults only.', isNsfw: true }
     ];
 
     let currentUser = null;
@@ -3955,7 +3967,7 @@
         return `
           <tr class="${rowClass}">
             <td>
-              <a href="javascript:void(0)" onclick="openBoard('${escapeHtml(b.name)}')" style="font-size:13px;">${escapeHtml(b.name)}</a>
+              ${b.isNsfw ? '<span style="background:#c0392b; color:#fff; font-size:9px; font-weight:bold; padding:1px 4px; border-radius:2px; margin-right:5px;">18+</span>' : ''}<a href="javascript:void(0)" onclick="openBoard('${escapeHtml(b.name)}')" style="font-size:13px;">${escapeHtml(b.name)}</a>
               <div class="board-desc">${escapeHtml(b.desc)}</div>
             </td>
             <td class="center-col">${boardThreads.length}</td>
@@ -3969,8 +3981,33 @@
       loadShoutbox();
     }
 
+
+    const NSFW_BOARD_NAME = 'NSFW / 18+ After Dark';
+
+    function hasConfirmedNsfw() {
+      try {
+        return localStorage.getItem('cantaloupe_nsfw_ok') === 'true';
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function ensureNsfwAccess(boardName) {
+      if (boardName !== NSFW_BOARD_NAME || hasConfirmedNsfw()) return true;
+      const ok = await openAppConfirm(
+        'This section contains mature 18+ content. Please confirm you are at least 18 years old to enter.',
+        '18+ Content Warning'
+      );
+      if (ok) {
+        try { localStorage.setItem('cantaloupe_nsfw_ok', 'true'); } catch (e) {}
+        return true;
+      }
+      return false;
+    }
+
     async function openBoard(boardName, pushHistory = true, boardPage = 1) {
       if (!currentUser) { showAuthPortal(); return; }
+      if (!(await ensureNsfwAccess(boardName))) return;
       currentBoard = boardName;
       currentThread = null;
       switchView('viewBoard');
@@ -4382,8 +4419,9 @@
 
     async function openRandomThread() {
       if (!currentUser) { showAuthPortal(); return; }
-      const { data: threads } = await db.from('messages').select('id').limit(100);
-      if (!threads || threads.length === 0) {
+      const { data: allT } = await db.from('messages').select('id, category').limit(100);
+      const threads = (allT || []).filter(t => hasConfirmedNsfw() || t.category !== NSFW_BOARD_NAME);
+      if (threads.length === 0) {
         showToast('No threads posted yet!');
         return;
       }
@@ -4491,6 +4529,7 @@
 
       const { data: thread, error } = await db.from('messages').select('*').eq('id', threadId).single();
       if (error || !thread) return;
+      if (!(await ensureNsfwAccess(thread.category))) return;
 
       currentThread = thread;
       currentThreadPage = page;
