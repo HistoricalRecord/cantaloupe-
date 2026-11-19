@@ -957,6 +957,26 @@
     }
     .crop-control-row label { width: 55px; font-weight: bold; }
     .crop-control-row input[type="range"] { flex: 1; padding: 0; border: none; }
+
+    .post-embed-wrap {
+      margin-top: 8px;
+      width: 100%;
+      max-width: 640px;
+      border: 1px solid #e0b492;
+      background: #000000;
+      overflow: hidden;
+    }
+    .post-embed-wrap iframe {
+      display: block;
+      width: 100%;
+      height: 380px;
+      border: 0;
+    }
+    @media (max-width: 600px) {
+      .post-embed-wrap iframe {
+        height: 240px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1293,6 +1313,7 @@
             <button type="button" onclick="insertBBCode('threadBodyInput', 'u')"><u>U</u></button>
             <button type="button" onclick="insertBBCode('threadBodyInput', 'url')">URL</button>
             <button type="button" onclick="insertBBCode('threadBodyInput', 'quote')">Quote</button>
+            <button type="button" onclick="insertBBCode('threadBodyInput', 'embed')">Embed</button>
           </div>
           <textarea id="threadBodyInput" rows="5" placeholder="Enter your message here..."></textarea>
           <div class="file-upload-row">
@@ -1349,6 +1370,7 @@
             <button type="button" onclick="insertBBCode('replyBodyInput', 'u')"><u>U</u></button>
             <button type="button" onclick="insertBBCode('replyBodyInput', 'url')">URL</button>
             <button type="button" onclick="insertBBCode('replyBodyInput', 'quote')">Quote</button>
+            <button type="button" onclick="insertBBCode('replyBodyInput', 'embed')">Embed</button>
           </div>
           <textarea id="replyBodyInput" rows="4" placeholder="Write your reply to this thread..."></textarea>
           <div class="file-upload-row">
@@ -2123,6 +2145,7 @@
           <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'u')"><u>U</u></button>
           <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'url')">URL</button>
           <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'quote')">Quote</button>
+          <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'embed')">Embed</button>
         </div>
         <textarea id="editText-${targetType}-${id}" rows="4" style="width:100%; margin-bottom:6px;">${escapeHtml(currentMessage)}</textarea>
         <div style="display:flex; gap:6px;">
@@ -2564,6 +2587,10 @@
         const url = await openAppPrompt('Enter URL:', 'https://', 'Insert Link');
         if (!url) return;
         replacement = `[url=${url}]${selected || url}[/url]`;
+      } else if (tag === 'embed') {
+        const url = await openAppPrompt('Paste embed URL (Archive.org, YouTube, Vimeo, Spotify):', selected || 'https://', 'Insert Embed');
+        if (!url) return;
+        replacement = `[embed]${url.trim()}[/embed]`;
       } else {
         replacement = `[${tag}]${selected}[/${tag}]`;
       }
@@ -3965,14 +3992,65 @@
       }[tag]));
     }
 
+    function toSafeEmbedUrl(rawUrl) {
+      if (!rawUrl) return null;
+      const decoded = rawUrl.replace(/&amp;/g, '&').trim();
+      let u;
+      try { u = new URL(decoded); } catch (e) { return null; }
+      if (u.protocol !== 'https:') return null;
+      const host = u.hostname.toLowerCase();
+
+      if (host === 'archive.org' && u.pathname.startsWith('/embed/')) return u.toString();
+      if ((host === 'www.youtube.com' || host === 'youtube.com') && u.pathname.startsWith('/embed/')) return u.toString();
+      if (host === 'www.youtube-nocookie.com' && u.pathname.startsWith('/embed/')) return u.toString();
+      if ((host === 'www.youtube.com' || host === 'youtube.com') && u.pathname === '/watch' && u.searchParams.get('v')) {
+        return `https://www.youtube.com/embed/${encodeURIComponent(u.searchParams.get('v'))}`;
+      }
+      if (host === 'youtu.be' && u.pathname.length > 1) {
+        return `https://www.youtube.com/embed/${encodeURIComponent(u.pathname.slice(1))}`;
+      }
+      if (host === 'player.vimeo.com' && u.pathname.startsWith('/video/')) return u.toString();
+      if (host === 'vimeo.com' && /^\/\d+/.test(u.pathname)) {
+        return `https://player.vimeo.com/video/${u.pathname.slice(1).split('/')[0]}`;
+      }
+      if (host === 'open.spotify.com' && u.pathname.startsWith('/embed/')) return u.toString();
+      if (host === 'open.spotify.com' && /^\/(track|album|playlist|episode)\//.test(u.pathname)) {
+        return `https://open.spotify.com/embed${u.pathname}`;
+      }
+      if (host === 'w.soundcloud.com' && u.pathname.startsWith('/player/')) return u.toString();
+      return null;
+    }
+
     function formatPostBody(str) {
       let safe = escapeHtml(str);
+      const placeholders = [];
+      const hold = (html) => {
+        const idx = placeholders.length;
+        placeholders.push(html);
+        return `%%CAN_EMBED_${idx}%%`;
+      };
+
+      // Extract trusted pasted <iframe> embeds before linkifying URLs
+      safe = safe.replace(/&lt;iframe\b[^&]*?\bsrc=(?:&quot;|&#39;)(https:\/\/[^&"'\s]+)(?:&quot;|&#39;)[^&]*?&gt;\s*&lt;\/iframe&gt;/gis, (match, srcUrl) => {
+        const embedSrc = toSafeEmbedUrl(srcUrl);
+        if (!embedSrc) return match;
+        return hold(`<div class="post-embed-wrap"><iframe src="${escapeHtml(embedSrc)}" allowfullscreen loading="lazy"></iframe></div>`);
+      });
+
+      // Extract [embed]...[/embed] BBCode
+      safe = safe.replace(/\[embed\](https:\/\/[^\]\s<"]+)\[\/embed\]/gis, (match, rawUrl) => {
+        const embedSrc = toSafeEmbedUrl(rawUrl);
+        if (!embedSrc) return match;
+        return hold(`<div class="post-embed-wrap"><iframe src="${escapeHtml(embedSrc)}" allowfullscreen loading="lazy"></iframe></div>`);
+      });
 
       // Parse BBCode
       safe = safe.replace(/\[b\](.*?)\[\/b\]/gis, '<b>$1</b>');
       safe = safe.replace(/\[i\](.*?)\[\/i\]/gis, '<i>$1</i>');
       safe = safe.replace(/\[u\](.*?)\[\/u\]/gis, '<u>$1</u>');
-      safe = safe.replace(/\[url=(https?:\/\/[^\]\s"]+)\](.*?)\[\/url\]/gis, '<a href="$1" target="_blank" rel="noopener noreferrer">$2</a>');
+      safe = safe.replace(/\[url=(https?:\/\/[^\]\s"]+)\](.*?)\[\/url\]/gis, (m, url, label) => {
+        return hold(`<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`);
+      });
       let prevSafe;
       do {
         prevSafe = safe;
@@ -3981,7 +4059,7 @@
       } while (safe !== prevSafe);
 
       // Parse Links, Images, and Videos (Checking Images FIRST)
-      return safe.replace(/(https?:\/\/[^\s<"]+)/g, url => {
+      safe = safe.replace(/(https?:\/\/[^\s<"]+)/g, url => {
         const cleanUrl = url.replace(/[.,!?;:)\]]+$/, '');
         const trailing = url.slice(cleanUrl.length);
         
@@ -3998,6 +4076,8 @@
         // 3. Fallback: Render regular URLs as clean, clickable hyperlinks
         return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>${trailing}`;
       });
+
+      return safe.replace(/%%CAN_EMBED_(\d+)%%/g, (_, idx) => placeholders[Number(idx)] || '');
     }
 
     init();
