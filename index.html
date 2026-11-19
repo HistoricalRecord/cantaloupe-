@@ -2108,7 +2108,10 @@
     }
 
     // EDIT POST FEATURE LOGIC
-    function startEditingPost(id, targetType, currentMessage) {
+    function startEditingPost(id, targetType) {
+      const post = allLoadedPosts.find(p => p.targetType === targetType && p.id === id);
+      if (!post) return;
+      const currentMessage = post.message || '';
       const cellId = `post-content-${targetType}-${id}`;
       const cell = document.getElementById(cellId);
       if (!cell) return;
@@ -3788,7 +3791,7 @@
 
         const isPostOwner = currentUser && (p.user_id === currentUser.id || myUsername === lName);
         const editBtn = (isAdmin || isPostOwner)
-          ? ` <button style="font-size:9px; padding:1px 4px; background:#f39c12; color:#fff;" onclick="startEditingPost(${p.id}, '${p.targetType}', ${JSON.stringify(p.message)})">Edit</button>`
+          ? ` <button style="font-size:9px; padding:1px 4px; background:#f39c12; color:#fff;" onclick="startEditingPost(${p.id}, '${p.targetType}')">Edit</button>`
           : '';
 
         const lockBtn = (isAdmin && p.isOP)
@@ -3970,8 +3973,12 @@
       safe = safe.replace(/\[i\](.*?)\[\/i\]/gis, '<i>$1</i>');
       safe = safe.replace(/\[u\](.*?)\[\/u\]/gis, '<u>$1</u>');
       safe = safe.replace(/\[url=(https?:\/\/[^\]\s"]+)\](.*?)\[\/url\]/gis, '<a href="$1" target="_blank" rel="noopener noreferrer">$2</a>');
-      safe = safe.replace(/\[quote=(.*?)D?\](.*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote by $1:</b><br/>$2</div>');
-      safe = safe.replace(/\[quote\](.*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote:</b><br/>$1</div>');
+      let prevSafe;
+      do {
+        prevSafe = safe;
+        safe = safe.replace(/\[quote=([^\]]+)\]((?:(?!\[quote[=\]]).)*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote by $1:</b><br/>$2</div>');
+        safe = safe.replace(/\[quote\]((?:(?!\[quote[=\]]).)*?)\[\/quote\]/gis, '<div class="bbcode-quote"><b>Quote:</b><br/>$1</div>');
+      } while (safe !== prevSafe);
 
       // Parse Links, Images, and Videos (Checking Images FIRST)
       return safe.replace(/(https?:\/\/[^\s<"]+)/g, url => {
