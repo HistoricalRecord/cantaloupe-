@@ -1209,6 +1209,7 @@
         <input type="text" id="searchInput" placeholder="Search forums..." style="width:130px; height:24px;" />
         <button onclick="performSearch()">Search</button>
         <button onclick="navigateHome()">Home</button>
+        <button type="button" onclick="openLatestPosts()" title="Latest posts across all boards">🔥 Latest</button>
         <button type="button" onclick="openRandomThread()" title="Jump to a random thread">🎲</button>
         <button id="themeToggleBtn" type="button" onclick="toggleDarkMode()" title="Toggle Dark Mode">🌙</button>
       </div>
@@ -1482,6 +1483,25 @@
           </tr>
         </thead>
         <tbody id="savedThreadsBody"></tbody>
+      </table>
+    </div>
+
+
+    <!-- LATEST POSTS FEED VIEW -->
+    <div id="viewLatestPosts" class="hidden">
+      <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1; display:flex; justify-content:space-between; align-items:center;">
+        <strong style="font-size:13px; color:#d35400;">🔥 Latest Activity Across All Boards</strong>
+        <button onclick="navigateHome()">&laquo; Home</button>
+      </div>
+      <table class="forum-table">
+        <thead>
+          <tr>
+            <th>Post / Thread</th>
+            <th style="width:130px;">Author</th>
+            <th class="last-post-col">Posted</th>
+          </tr>
+        </thead>
+        <tbody id="latestPostsBody"></tbody>
       </table>
     </div>
 
@@ -2339,6 +2359,8 @@
         await openPrivateChat(chatUser, false);
       } else if (view === 'inbox') {
         await openInbox(false);
+      } else if (view === 'latest') {
+        await openLatestPosts(false);
       } else if (view === 'members') {
         await openMemberList(false);
       } else if (view === 'profile') {
@@ -2364,6 +2386,8 @@
         openPrivateChat(state.username, false);
       } else if (state.view === 'inbox') {
         openInbox(false);
+      } else if (state.view === 'latest') {
+        openLatestPosts(false);
       } else if (state.view === 'members') {
         openMemberList(false);
       } else if (state.view === 'profile') {
@@ -3861,7 +3885,7 @@
     }
 
     function switchView(viewId) {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch', 'viewMemberList', 'viewAuthPortal', 'viewUserProfile', 'viewResetPassword', 'viewSavedThreads'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch', 'viewMemberList', 'viewAuthPortal', 'viewUserProfile', 'viewResetPassword', 'viewSavedThreads', 'viewLatestPosts'].forEach(id => {
         document.getElementById(id).classList.toggle('hidden', id !== viewId);
       });
     }
@@ -4287,6 +4311,73 @@
       const saved = getSavedThreads(myUname).filter(item => item.id !== threadId);
       saveThreadsList(myUname, saved);
       openSavedThreads();
+    }
+
+
+    async function openLatestPosts(pushHistory = true) {
+      if (!currentUser) { showAuthPortal(); return; }
+      switchView('viewLatestPosts');
+      document.getElementById('breadcrumbNav').innerHTML = `
+        <span><a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>🔥 Latest Posts</b></span>
+        <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
+      `;
+      if (pushHistory) {
+        history.pushState({ view: 'latest' }, '', '?view=latest');
+      }
+
+      const tbody = document.getElementById('latestPostsBody');
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:16px;">Loading latest activity...</td></tr>';
+
+      const [{ data: recentThreads }, { data: recentReplies }] = await Promise.all([
+        db.from('messages').select('id, title, category, username, created_at').order('created_at', { ascending: false }).limit(20),
+        db.from('replies').select('id, thread_id, message, username, created_at').order('created_at', { ascending: false }).limit(25)
+      ]);
+
+      const threadTitleMap = {};
+      (recentThreads || []).forEach(t => { threadTitleMap[t.id] = t.title; });
+
+      const feed = [
+        ...(recentThreads || []).map(t => ({
+          kind: 'Thread',
+          threadId: t.id,
+          postId: t.id,
+          label: t.title || 'Untitled Thread',
+          sub: `Board: ${t.category}`,
+          username: t.username || 'Member',
+          created_at: t.created_at
+        })),
+        ...(recentReplies || []).map(r => ({
+          kind: 'Reply',
+          threadId: r.thread_id,
+          postId: r.id,
+          label: `${threadTitleMap[r.thread_id] ? threadTitleMap[r.thread_id] + ' — ' : ''}${(r.message || '').slice(0, 70)}${(r.message || '').length > 70 ? '...' : ''}`,
+          sub: `Reply in Thread #${r.thread_id}`,
+          username: r.username || 'Member',
+          created_at: r.created_at
+        }))
+      ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 25);
+
+      if (feed.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:18px; color:#7a7267;">No posts yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = feed.map((item, idx) => {
+        const clickAction = item.kind === 'Reply'
+          ? `openThread(${item.threadId}, 1, true, { type: 'reply', id: ${item.postId} })`
+          : `openThread(${item.threadId}, 1)`;
+        return `
+          <tr class="${idx % 2 === 0 ? 'row-odd' : 'row-even'}">
+            <td>
+              <b style="font-size:10px; color:#7a7267;">[${item.kind}]</b>
+              <a href="javascript:void(0)" onclick="${clickAction}">${escapeHtml(item.label)}</a>
+              <div class="board-desc">${escapeHtml(item.sub)}</div>
+            </td>
+            <td><a href="javascript:void(0)" onclick="openProfile('${escapeHtml(item.username)}')">${escapeHtml(item.username)}</a></td>
+            <td class="last-post-col">${formatDate(item.created_at)}</td>
+          </tr>
+        `;
+      }).join('');
     }
 
     async function openRandomThread() {
