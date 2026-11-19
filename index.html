@@ -652,8 +652,24 @@
 
     @media (max-width: 600px) {
       body { padding: 4px; }
-      .post-author-cell { width: 100px; padding: 8px; }
-      .author-avatar { width: 64px; height: 64px; }
+      .post-box { margin: 8px 4px; }
+      .post-body-table, .post-body-table tbody, .post-body-table tr, .post-body-table td {
+        display: block;
+        width: 100% !important;
+      }
+      .post-author-cell {
+        width: 100% !important;
+        border-right: none;
+        border-bottom: 1px solid #f3dcd1;
+        padding: 8px 10px;
+        display: flex !important;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+      .author-avatar { width: 44px; height: 44px; margin: 0; }
+      .author-bio { width: 100%; margin-bottom: 2px; padding-bottom: 4px; }
+      .post-content-cell { padding: 10px; }
       .last-post-col { display: none; }
       .profile-sidebar { width: 100%; border-right: none; border-bottom: 1px solid #f3dcd1; }
       .notif-panel {
@@ -974,7 +990,7 @@
     }
     @media (max-width: 600px) {
       .post-embed-wrap iframe {
-        height: 240px;
+        height: 310px;
       }
     }
   </style>
@@ -4035,14 +4051,14 @@
       safe = safe.replace(/&lt;iframe\b(?:(?!&gt;)[\s\S])*?\bsrc=(?:&quot;|&#39;)(https:\/\/[^\s<]+?)(?:&quot;|&#39;)(?:(?!&gt;)[\s\S])*?&gt;\s*&lt;\/iframe&gt;/gis, (match, srcUrl) => {
         const embedSrc = toSafeEmbedUrl(srcUrl);
         if (!embedSrc) return match;
-        return hold(`<div class="post-embed-wrap"><iframe src="${escapeHtml(embedSrc)}" allowfullscreen loading="lazy"></iframe></div>`);
+        return hold(`<div class="post-embed-wrap"><iframe src="${escapeHtml(embedSrc)}" allow="fullscreen; autoplay" webkitallowfullscreen="true" mozallowfullscreen="true" allowfullscreen loading="lazy"></iframe></div>`);
       });
 
       // Extract [embed]...[/embed] BBCode
       safe = safe.replace(/\[embed\](https:\/\/[^\]\s<"]+)\[\/embed\]/gis, (match, rawUrl) => {
         const embedSrc = toSafeEmbedUrl(rawUrl);
         if (!embedSrc) return match;
-        return hold(`<div class="post-embed-wrap"><iframe src="${escapeHtml(embedSrc)}" allowfullscreen loading="lazy"></iframe></div>`);
+        return hold(`<div class="post-embed-wrap"><iframe src="${escapeHtml(embedSrc)}" allow="fullscreen; autoplay" webkitallowfullscreen="true" mozallowfullscreen="true" allowfullscreen loading="lazy"></iframe></div>`);
       });
 
       // Parse BBCode
