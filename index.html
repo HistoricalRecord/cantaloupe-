@@ -1394,6 +1394,7 @@
         </thead>
         <tbody id="threadListBody"></tbody>
       </table>
+      <div id="boardPaginationBar" class="pagination-bar hidden"></div>
     </div>
 
     <!-- VIEW 3: SINGLE THREAD & REPLIES -->
@@ -1483,6 +1484,8 @@
     let currentPmSender = null;
     let viewedProfileUsername = null;
     const POSTS_PER_PAGE = 50;
+    const THREADS_PER_PAGE = 25;
+    let currentBoardPage = 1;
 
     let presenceChannel = null;
     let onlineUsernames = new Set();
@@ -2253,7 +2256,12 @@
       const cell = document.getElementById(cellId);
       if (!cell) return;
 
+      const titleInputHtml = targetType === 'message'
+        ? `<input type="text" id="editTitle-message-${id}" value="${escapeHtml(post.title || '')}" placeholder="Thread Title" maxlength="120" style="width:100%; margin-bottom:6px; font-weight:bold;" />`
+        : '';
+
       cell.innerHTML = `
+        ${titleInputHtml}
         <div class="bbcode-bar">
           <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'b')"><b>B</b></button>
           <button type="button" onclick="insertBBCode('editText-${targetType}-${id}', 'i')"><i>I</i></button>
@@ -2283,8 +2291,21 @@
         showToast('Please log in to edit posts.');
         return;
       }
+      const updatePayload = { message: newContent };
+      if (targetType === 'message') {
+        const titleEl = document.getElementById(`editTitle-message-${id}`);
+        if (titleEl) {
+          const newTitle = titleEl.value.trim();
+          if (!newTitle) {
+            showToast('Thread title cannot be empty.');
+            return;
+          }
+          updatePayload.title = newTitle;
+        }
+      }
+
       const table = targetType === 'message' ? 'messages' : 'replies';
-      const { data, error } = await db.from(table).update({ message: newContent }).eq('id', id).select();
+      const { data, error } = await db.from(table).update(updatePayload).eq('id', id).select();
 
       if (error) {
         showToast('Error updating post: ' + error.message);
@@ -3689,7 +3710,7 @@
       updateForumStatsUI(Array.from(onlineUsernames), onlineGuestsCount);
     }
 
-    async function openBoard(boardName, pushHistory = true) {
+    async function openBoard(boardName, pushHistory = true, boardPage = 1) {
       if (!currentUser) { showAuthPortal(); return; }
       currentBoard = boardName;
       currentThread = null;
@@ -3743,11 +3764,18 @@
         return (lastActivityMap[b.id] || 0) - (lastActivityMap[a.id] || 0);
       });
 
+      const totalBoardPages = Math.ceil(sortedThreads.length / THREADS_PER_PAGE) || 1;
+      if (boardPage > totalBoardPages) boardPage = totalBoardPages;
+      if (boardPage < 1) boardPage = 1;
+      currentBoardPage = boardPage;
+      const bStart = (boardPage - 1) * THREADS_PER_PAGE;
+      const pageThreads = sortedThreads.slice(bStart, bStart + THREADS_PER_PAGE);
+
       const isAdmin = checkIsAdmin();
       const myUname = currentUser ? (currentUser.user_metadata?.username || currentUser.email.split('@')[0]) : '';
       const threadSeenMap = myUname ? getThreadSeenMap(myUname) : {};
 
-      tbody.innerHTML = sortedThreads.map((t, idx) => {
+      tbody.innerHTML = pageThreads.map((t, idx) => {
         const replyCount = allReplies.filter(r => r.thread_id === t.id).length;
         const rowClass = t.is_sticky ? 'sticky-row' : (idx % 2 === 0 ? 'row-odd' : 'row-even');
         const isUnread = (lastActivityMap[t.id] || 0) > (threadSeenMap[t.id] || 0);
@@ -3773,6 +3801,25 @@
           </tr>
         `;
       }).join('');
+
+      const boardPagBar = document.getElementById('boardPaginationBar');
+      if (boardPagBar) {
+        if (totalBoardPages > 1) {
+          let bPagHtml = `<span>Pages (${totalBoardPages}):</span>`;
+          for (let i = 1; i <= totalBoardPages; i++) {
+            if (i === boardPage) {
+              bPagHtml += `<span>${i}</span>`;
+            } else {
+              bPagHtml += `<a href="javascript:void(0)" onclick="openBoard('${escapeHtml(boardName)}', false, ${i})">${i}</a>`;
+            }
+          }
+          boardPagBar.innerHTML = bPagHtml;
+          boardPagBar.classList.remove('hidden');
+        } else {
+          boardPagBar.innerHTML = '';
+          boardPagBar.classList.add('hidden');
+        }
+      }
     }
 
     function toggleNewThreadForm() {
