@@ -1571,6 +1571,21 @@
       } catch (e) {}
     }
 
+    function getSeenThreadIds(username) {
+      try {
+        const raw = localStorage.getItem('cantaloupe_seen_threads_' + username.toLowerCase());
+        return new Set(raw ? JSON.parse(raw) : []);
+      } catch (e) {
+        return new Set();
+      }
+    }
+
+    function saveSeenThreadIds(username, idSet) {
+      try {
+        localStorage.setItem('cantaloupe_seen_threads_' + username.toLowerCase(), JSON.stringify(Array.from(idSet).slice(-150)));
+      } catch (e) {}
+    }
+
     function getSeenVoteKeys(username) {
       try {
         const raw = localStorage.getItem('cantaloupe_seen_votes_' + username.toLowerCase());
@@ -1741,7 +1756,30 @@
         };
       });
 
-      siteNotifications = [...dmNotifs, ...quoteNotifs, ...voteNotifs]
+      let threadNotifs = [];
+      if (checkIsAdmin()) {
+        const seenThreads = getSeenThreadIds(myUsername);
+        const { data: recentThreads } = await db
+          .from('messages')
+          .select('id, title, category, username, user_id, created_at')
+          .order('created_at', { ascending: false })
+          .limit(30);
+
+        threadNotifs = (recentThreads || [])
+          .filter(m => m.user_id !== currentUser.id && (m.username || '').toLowerCase() !== lName)
+          .map(m => ({
+            key: 'thread-' + m.id,
+            type: 'thread',
+            id: m.id,
+            threadId: m.id,
+            from: m.username || 'Member',
+            text: `${m.username || 'Member'} started "${(m.title || 'Untitled').slice(0, 40)}" in ${m.category}`,
+            created_at: m.created_at,
+            unread: !seenThreads.has(m.id)
+          }));
+      }
+
+      siteNotifications = [...dmNotifs, ...quoteNotifs, ...voteNotifs, ...threadNotifs]
         .filter(n => !deletedNotifs.has(n.key))
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         .slice(0, 60);
@@ -1766,7 +1804,7 @@
       body.innerHTML = siteNotifications.map((n, idx) => {
         const badge = n.type === 'dm'
           ? '💬 DM'
-          : (n.type === 'quote' ? '❝ Quote' : (n.voteType === 1 ? '▲ Upvote' : '▼ Downvote'));
+          : (n.type === 'quote' ? '❝ Quote' : (n.type === 'thread' ? '🆕 New Thread' : (n.voteType === 1 ? '▲ Upvote' : '▼ Downvote')));
         return `
           <div class="notif-item ${n.unread ? 'unread' : ''}" onclick="handleNotificationClick(${idx})">
             <div class="notif-item-content">
@@ -1803,6 +1841,13 @@
         n.unread = false;
         renderNotifications();
         if (n.threadId) await openThread(n.threadId, 1, true, { type: n.targetType, id: n.targetId });
+      } else if (n.type === 'thread') {
+        const seenThreads = getSeenThreadIds(myUsername);
+        seenThreads.add(n.id);
+        saveSeenThreadIds(myUsername, seenThreads);
+        n.unread = false;
+        renderNotifications();
+        await openThread(n.threadId, 1, true, { type: 'message', id: n.id });
       }
     }
 
@@ -1842,13 +1887,16 @@
 
       const seen = getSeenQuoteIds(myUsername);
       const seenVotes = getSeenVoteKeys(myUsername);
+      const seenThreads = getSeenThreadIds(myUsername);
       siteNotifications.forEach(n => {
         if (n.type === 'quote') seen.add(n.id);
         if (n.type === 'vote') seenVotes.add(n.key);
+        if (n.type === 'thread') seenThreads.add(n.id);
         n.unread = false;
       });
       saveSeenQuoteIds(myUsername, seen);
       saveSeenVoteKeys(myUsername, seenVotes);
+      saveSeenThreadIds(myUsername, seenThreads);
 
       const unreadDmIds = siteNotifications.filter(n => n.type === 'dm').map(n => n.id);
       if (unreadDmIds.length > 0) {
@@ -1959,10 +2007,19 @@
       }
 
       db.channel('forum-realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
           if (!document.getElementById('viewIndex').classList.contains('hidden')) showIndex();
           if (!document.getElementById('viewBoard').classList.contains('hidden') && currentBoard) openBoard(currentBoard, false);
           if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage, false);
+          if (currentUser && checkIsAdmin() && payload.eventType === 'INSERT' && payload.new) {
+            const myUsername = (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase();
+            const author = (payload.new.username || '').toLowerCase();
+            if (payload.new.user_id !== currentUser.id && author !== myUsername) {
+              loadNotifications();
+              const tTitle = (payload.new.title || 'New Thread').slice(0, 35);
+              showToast(`🆕 ${payload.new.username || 'Member'} started "${tTitle}"! Click to view.`, () => openThread(payload.new.id, 1, true, { type: 'message', id: payload.new.id }));
+            }
+          }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'replies' }, (payload) => {
           if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread && payload.new?.thread_id === currentThread.id) {
