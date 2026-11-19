@@ -1384,7 +1384,7 @@
             <th>Thread Title</th>
             <th style="width:130px;">Author</th>
             <th class="center-col">Replies</th>
-            <th class="last-post-col">Posted</th>
+            <th class="last-post-col">Last Activity</th>
           </tr>
         </thead>
         <tbody id="threadListBody"></tbody>
@@ -2899,6 +2899,20 @@
       }
     }
 
+    async function openReportedPost(targetType, targetId) {
+      if (!targetType || targetId == null) return;
+      if (targetType === 'message') {
+        await openThread(targetId, 1, true, { type: 'message', id: targetId });
+        return;
+      }
+      const { data: rep } = await db.from('replies').select('id, thread_id').eq('id', targetId).maybeSingle();
+      if (rep && rep.thread_id) {
+        await openThread(rep.thread_id, 1, true, { type: 'reply', id: rep.id });
+      } else {
+        showToast('That reported post was already deleted.');
+      }
+    }
+
     async function dismissReport(reportId) {
       await db.from('post_reports').delete().eq('id', reportId);
       showIndex();
@@ -3544,7 +3558,7 @@
         if (reports && reports.length > 0) {
           document.getElementById('adminReportsBody').innerHTML = reports.map(r => `
             <div style="padding:4px 0; border-bottom:1px solid #f3dcd1; font-size:11px;">
-              <b>[${r.target_type.toUpperCase()} #${r.target_id}]</b> Reported by <b>${escapeHtml(r.reporter_username)}</b>: "${escapeHtml(r.reason)}" (${formatDate(r.created_at)})
+              <a href="javascript:void(0)" onclick="openReportedPost('${escapeHtml(r.target_type)}', ${r.target_id})">[${r.target_type.toUpperCase()} #${r.target_id}]</a> Reported by <b>${escapeHtml(r.reporter_username)}</b>: "${escapeHtml(r.reason)}" (${formatDate(r.created_at)})
               <button style="font-size:9px; padding:1px 4px; margin-left:6px;" onclick="dismissReport(${r.id})">Dismiss</button>
             </div>
           `).join('');
@@ -3691,7 +3705,7 @@
         .order('is_sticky', { ascending: false })
         .order('created_at', { ascending: false });
 
-      const { data: replies } = await db.from('replies').select('id, thread_id, created_at');
+      const { data: replies } = await db.from('replies').select('id, thread_id, username, created_at');
       const allReplies = replies || [];
 
       const tbody = document.getElementById('threadListBody');
@@ -3706,11 +3720,15 @@
       }
 
       const lastActivityMap = {};
+      const latestReplyMap = {};
       threads.forEach(t => { lastActivityMap[t.id] = new Date(t.created_at).getTime(); });
       allReplies.forEach(r => {
         const rTime = new Date(r.created_at).getTime();
         if (!lastActivityMap[r.thread_id] || rTime > lastActivityMap[r.thread_id]) {
           lastActivityMap[r.thread_id] = rTime;
+        }
+        if (!latestReplyMap[r.thread_id] || rTime > latestReplyMap[r.thread_id].ts) {
+          latestReplyMap[r.thread_id] = { id: r.id, username: r.username || 'Member', created_at: r.created_at, ts: rTime };
         }
       });
 
@@ -3732,13 +3750,20 @@
         const lockedPrefix = t.is_locked ? '<b style="color:#c0392b;">[Locked] 🔒</b> ' : '';
         const stickyBtn = isAdmin ? ` <button style="font-size:9px; padding:1px 4px;" onclick="toggleSticky(${t.id}, ${!t.is_sticky})">${t.is_sticky ? 'Unpin' : 'Pin'}</button>` : '';
         const authorName = t.username || 'Member';
+        const latestRep = latestReplyMap[t.id];
+        const latestJumpLink = latestRep
+          ? ` <a href="javascript:void(0)" title="Jump to latest reply" onclick="openThread(${t.id}, 1, true, { type: 'reply', id: ${latestRep.id} })" style="font-size:10px;">&raquo; Latest</a>`
+          : '';
+        const lastActivityHtml = latestRep
+          ? `${formatDate(latestRep.created_at)}<div class="board-desc">Last by <a href="javascript:void(0)" onclick="openProfile('${escapeHtml(latestRep.username)}')">${escapeHtml(latestRep.username)}</a></div>`
+          : formatDate(t.created_at);
 
         return `
           <tr class="${rowClass}">
-            <td>${newBadge}${lockedPrefix}${stickyPrefix}<a href="javascript:void(0)" onclick="openThread(${t.id}, 1)">${escapeHtml(t.title || 'Untitled Thread')}</a>${stickyBtn}</td>
+            <td>${newBadge}${lockedPrefix}${stickyPrefix}<a href="javascript:void(0)" onclick="openThread(${t.id}, 1)">${escapeHtml(t.title || 'Untitled Thread')}</a>${latestJumpLink}${stickyBtn}</td>
             <td><a href="javascript:void(0)" onclick="openProfile('${escapeHtml(authorName)}')">${escapeHtml(authorName)}</a></td>
             <td class="center-col">${replyCount}</td>
-            <td class="last-post-col">${formatDate(t.created_at)}</td>
+            <td class="last-post-col">${lastActivityHtml}</td>
           </tr>
         `;
       }).join('');
