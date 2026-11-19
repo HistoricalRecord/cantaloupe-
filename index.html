@@ -1034,6 +1034,94 @@
       width: 100%;
       height: 100%;
     }
+
+    /* Emoji Reactions */
+    .post-footer-actions {
+      justify-content: space-between;
+      align-items: center;
+    }
+    .reaction-bar {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .reaction-pill {
+      font-size: 11px;
+      padding: 2px 6px !important;
+      background: #ffffff;
+      border: 1px solid #d3a081;
+      border-radius: 12px;
+      color: #5a4a3f;
+      font-weight: bold;
+    }
+    .reaction-pill.active {
+      background: #fdebd0;
+      border-color: #e67e22;
+      color: #d35400;
+    }
+    body.dark-mode .reaction-pill {
+      background: #221e1b;
+      border-color: #5c493b;
+      color: #e6ddd3;
+    }
+    body.dark-mode .reaction-pill.active {
+      background: #422e1d;
+      border-color: #e67e22;
+      color: #ff9f43;
+    }
+    .post-action-btns {
+      display: flex;
+      gap: 6px;
+      margin-left: auto;
+    }
+
+    /* Thread Poll Box */
+    .poll-box {
+      margin: 10px;
+      border: 1px solid #e0b492;
+      background: #fff9f5;
+    }
+    .poll-header {
+      background: linear-gradient(180deg, #f39c12 0%, #d35400 100%);
+      color: #ffffff;
+      padding: 6px 10px;
+      font-weight: bold;
+      font-size: 12px;
+    }
+    .poll-body {
+      padding: 10px 12px;
+    }
+    .poll-option-row {
+      margin-bottom: 8px;
+    }
+    .poll-option-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      margin-bottom: 3px;
+    }
+    .poll-bar-bg {
+      width: 100%;
+      height: 10px;
+      background: #f3dcd1;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .poll-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #f39c12, #e67e22);
+      transition: width 0.25s ease;
+    }
+    body.dark-mode .poll-box {
+      background: #26211d;
+      border-color: #4a3b30;
+    }
+    body.dark-mode .poll-bar-bg {
+      background: #382e26;
+    }
   </style>
 </head>
 <body>
@@ -1377,6 +1465,13 @@
             <label for="threadImageInput"><b>Attach Media (Images/Videos, Multiple):</b></label>
             <input type="file" id="threadImageInput" accept="image/*,video/*" multiple />
           </div>
+          <div style="margin-bottom:8px;">
+            <button type="button" onclick="togglePollBuilder()" style="font-size:10px; padding:3px 8px;">📊 + Add Poll (Optional)</button>
+            <div id="newThreadPollBox" class="hidden" style="margin-top:8px; padding:8px; border:1px dashed #d3a081;">
+              <input type="text" id="pollQuestionInput" placeholder="Poll Question (e.g. Who wins tonight?)" maxlength="140" />
+              <textarea id="pollOptionsInput" rows="3" placeholder="Poll options (one per line, 2 to 8 options)"></textarea>
+            </div>
+          </div>
           <button class="primary-btn" id="submitThreadBtn" onclick="createThread()">Submit New Thread</button>
           <button onclick="toggleNewThreadForm()">Cancel</button>
           <div id="threadStatus" class="status-msg"></div>
@@ -1412,6 +1507,7 @@
       </div>
 
       <div id="threadPaginationHeader" class="pagination-bar hidden"></div>
+      <div id="threadPollContainer" class="hidden"></div>
       <div id="threadPostsContainer"></div>
       <div id="threadPaginationTop" class="pagination-bar"></div>
       <div style="padding:6px 10px; text-align:right; background:#fff9f2; border-top:1px solid #f3dcd1;">
@@ -2099,6 +2195,12 @@
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'post_reports' }, () => {
           if (!document.getElementById('viewIndex').classList.contains('hidden')) showIndex();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'post_reactions' }, () => {
+          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage, false);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, () => {
+          if (!document.getElementById('viewThread').classList.contains('hidden') && currentThread) openThread(currentThread.id, currentThreadPage, false);
         })
         .subscribe();
     }
@@ -3822,6 +3924,83 @@
       }
     }
 
+
+    const REACTION_EMOJIS = ['👍', '😂', '🔥', '🍈', '😮', '❤️'];
+
+    function togglePollBuilder() {
+      const box = document.getElementById('newThreadPollBox');
+      if (box) box.classList.toggle('hidden');
+    }
+
+    async function votePoll(pollId, optionIndex) {
+      if (!currentUser) {
+        showToast('Please log in to vote in polls.');
+        return;
+      }
+      try {
+        const { data: existing } = await db
+          .from('poll_votes')
+          .select('id, option_index')
+          .eq('poll_id', pollId)
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+
+        if (existing) {
+          if (existing.option_index === optionIndex) {
+            await db.from('poll_votes').delete().eq('id', existing.id);
+          } else {
+            await db.from('poll_votes').update({ option_index: optionIndex }).eq('id', existing.id);
+          }
+        } else {
+          await db.from('poll_votes').insert({
+            poll_id: pollId,
+            user_id: currentUser.id,
+            option_index: optionIndex
+          });
+        }
+        if (currentThread) await openThread(currentThread.id, currentThreadPage, false);
+      } catch (err) {
+        showToast('Poll error: ' + (err.message || 'Check Supabase poll_votes table'));
+      }
+    }
+
+    async function toggleReaction(targetType, targetId, emoji) {
+      if (!currentUser) {
+        showToast('Please log in to react.');
+        return;
+      }
+      const myUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      try {
+        const { data: existing, error: selErr } = await db
+          .from('post_reactions')
+          .select('id')
+          .eq('user_id', currentUser.id)
+          .eq('target_type', targetType)
+          .eq('target_id', targetId)
+          .eq('emoji', emoji)
+          .maybeSingle();
+
+        if (selErr) throw selErr;
+
+        if (existing) {
+          const { error: delErr } = await db.from('post_reactions').delete().eq('id', existing.id);
+          if (delErr) throw delErr;
+        } else {
+          const { error: insErr } = await db.from('post_reactions').insert({
+            user_id: currentUser.id,
+            username: myUsername,
+            target_type: targetType,
+            target_id: targetId,
+            emoji: emoji
+          });
+          if (insErr) throw insErr;
+        }
+        if (currentThread) await openThread(currentThread.id, currentThreadPage, false);
+      } catch (err) {
+        showToast('Reaction error: ' + (err.message || 'Check Supabase post_reactions table'));
+      }
+    }
+
     function toggleNewThreadForm() {
       document.getElementById('newThreadForm').classList.toggle('hidden');
     }
@@ -3874,9 +4053,25 @@
 
         if (error) throw error;
 
+        const pollQ = (document.getElementById('pollQuestionInput')?.value || '').trim();
+        const pollOptsRaw = (document.getElementById('pollOptionsInput')?.value || '').trim();
+        const pollOpts = pollOptsRaw.split('\n').map(o => o.trim()).filter(Boolean).slice(0, 8);
+        if (pollQ && pollOpts.length >= 2) {
+          try {
+            await db.from('polls').insert({
+              thread_id: data.id,
+              question: pollQ,
+              options: pollOpts
+            });
+          } catch (e) {}
+        }
+
         titleInput.value = '';
         bodyInput.value = '';
         imageInput.value = '';
+        if (document.getElementById('pollQuestionInput')) document.getElementById('pollQuestionInput').value = '';
+        if (document.getElementById('pollOptionsInput')) document.getElementById('pollOptionsInput').value = '';
+        if (document.getElementById('newThreadPollBox')) document.getElementById('newThreadPollBox').classList.add('hidden');
         status.textContent = '';
         document.getElementById('newThreadForm').classList.add('hidden');
         openThread(data.id, 1);
@@ -3969,6 +4164,52 @@
       const pagePosts = allLoadedPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
 
       const { data: allVotes } = await db.from('votes').select('*');
+      let allReactions = [];
+      try {
+        const { data: rData } = await db.from('post_reactions').select('*');
+        if (rData) allReactions = rData;
+      } catch (e) {}
+
+      const pollCont = document.getElementById('threadPollContainer');
+      if (pollCont) {
+        pollCont.classList.add('hidden');
+        pollCont.innerHTML = '';
+        try {
+          const { data: poll } = await db.from('polls').select('*').eq('thread_id', threadId).maybeSingle();
+          if (poll && Array.isArray(poll.options) && poll.options.length >= 2) {
+            const { data: pVotes } = await db.from('poll_votes').select('*').eq('poll_id', poll.id);
+            const pollVotes = pVotes || [];
+            const totalPollVotes = pollVotes.length;
+            const myPollVote = currentUser ? pollVotes.find(v => v.user_id === currentUser.id)?.option_index : -1;
+
+            pollCont.innerHTML = `
+              <div class="poll-box">
+                <div class="poll-header">📊 Poll: ${escapeHtml(poll.question)} (${totalPollVotes} vote${totalPollVotes === 1 ? '' : 's'})</div>
+                <div class="poll-body">
+                  ${poll.options.map((opt, idx) => {
+                    const count = pollVotes.filter(v => v.option_index === idx).length;
+                    const pct = totalPollVotes > 0 ? Math.round((count / totalPollVotes) * 100) : 0;
+                    const votedThis = myPollVote === idx;
+                    return `
+                      <div class="poll-option-row">
+                        <div class="poll-option-top">
+                          <span><b>${escapeHtml(opt)}</b> ${votedThis ? '<span style="color:#27ae60;">(Your Vote)</span>' : ''}</span>
+                          <span style="display:flex; align-items:center; gap:6px;">
+                            <span>${count} (${pct}%)</span>
+                            <button type="button" class="${votedThis ? 'primary-btn' : ''}" style="font-size:10px; padding:2px 7px;" onclick="votePoll(${poll.id}, ${idx})">${votedThis ? 'Voted' : 'Vote'}</button>
+                          </span>
+                        </div>
+                        <div class="poll-bar-bg"><div class="poll-bar-fill" style="width:${pct}%;"></div></div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            `;
+            pollCont.classList.remove('hidden');
+          }
+        } catch (e) {}
+      }
       const isAdmin = checkIsAdmin();
       const myUsername = currentUser ? (currentUser.user_metadata?.username || currentUser.email.split('@')[0]).toLowerCase() : '';
 
@@ -4016,11 +4257,24 @@
           ? ` <button style="font-size:9px; padding:1px 4px; background:#e74c3c; color:#fff;" onclick="deletePostItem(${p.id}, '${p.targetType}')">Delete</button>`
           : '';
 
-        const quoteRespondFooter = (currentUser && !thread.is_locked)
+        const postReacts = allReactions.filter(r => r.target_type === p.targetType && r.target_id === p.id);
+        const reactionButtonsHtml = REACTION_EMOJIS.map(em => {
+          const matching = postReacts.filter(r => r.emoji === em);
+          const count = matching.length;
+          const reacted = currentUser && matching.some(r => r.user_id === currentUser.id);
+          return `<button type="button" class="reaction-pill${reacted ? ' active' : ''}" onclick="toggleReaction('${p.targetType}', ${p.id}, '${em}')">${em}${count > 0 ? ' ' + count : ''}</button>`;
+        }).join('');
+
+        const quoteRespondFooter = currentUser
           ? `
             <div class="post-footer-actions">
-              <button type="button" onclick="quotePost('${p.targetType}', ${p.id})">&ldquo; Quote</button>
-              <button type="button" class="primary-btn" onclick="respondToPost('${p.targetType}', ${p.id})">&#8617; Respond</button>
+              <div class="reaction-bar">${reactionButtonsHtml}</div>
+              ${!thread.is_locked ? `
+                <div class="post-action-btns">
+                  <button type="button" onclick="quotePost('${p.targetType}', ${p.id})">&ldquo; Quote</button>
+                  <button type="button" class="primary-btn" onclick="respondToPost('${p.targetType}', ${p.id})">&#8617; Respond</button>
+                </div>
+              ` : ''}
             </div>
           `
           : '';
