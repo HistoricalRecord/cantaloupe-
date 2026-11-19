@@ -3994,7 +3994,8 @@
 
     function toSafeEmbedUrl(rawUrl) {
       if (!rawUrl) return null;
-      const decoded = rawUrl.replace(/&amp;/g, '&').trim();
+      let decoded = rawUrl.trim();
+      while (decoded.includes('&amp;')) decoded = decoded.replace(/&amp;/g, '&');
       let u;
       try { u = new URL(decoded); } catch (e) { return null; }
       if (u.protocol !== 'https:') return null;
@@ -4031,7 +4032,7 @@
       };
 
       // Extract trusted pasted <iframe> embeds before linkifying URLs
-      safe = safe.replace(/&lt;iframe\b[^&]*?\bsrc=(?:&quot;|&#39;)(https:\/\/[^&"'\s]+)(?:&quot;|&#39;)[^&]*?&gt;\s*&lt;\/iframe&gt;/gis, (match, srcUrl) => {
+      safe = safe.replace(/&lt;iframe\b(?:(?!&gt;)[\s\S])*?\bsrc=(?:&quot;|&#39;)(https:\/\/[^\s<]+?)(?:&quot;|&#39;)(?:(?!&gt;)[\s\S])*?&gt;\s*&lt;\/iframe&gt;/gis, (match, srcUrl) => {
         const embedSrc = toSafeEmbedUrl(srcUrl);
         if (!embedSrc) return match;
         return hold(`<div class="post-embed-wrap"><iframe src="${escapeHtml(embedSrc)}" allowfullscreen loading="lazy"></iframe></div>`);
