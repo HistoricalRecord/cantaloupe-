@@ -1209,6 +1209,7 @@
         <input type="text" id="searchInput" placeholder="Search forums..." style="width:130px; height:24px;" />
         <button onclick="performSearch()">Search</button>
         <button onclick="navigateHome()">Home</button>
+        <button type="button" onclick="openRandomThread()" title="Jump to a random thread">🎲</button>
         <button id="themeToggleBtn" type="button" onclick="toggleDarkMode()" title="Toggle Dark Mode">🌙</button>
       </div>
     </div>
@@ -1235,6 +1236,7 @@
             </div>
           </div>
         </div>
+        <button id="savedThreadsBtn" onclick="openSavedThreads()">★ Saved</button>
         <button id="inboxBtn" onclick="openInbox()">Inbox (0)</button>
         <button class="primary-btn" onclick="toggleProfileEditor()">Edit Profile</button>
         <button onclick="signOut()">Log Out</button>
@@ -1464,6 +1466,25 @@
       </div>
     </div>
 
+
+    <!-- SAVED / BOOKMARKED THREADS VIEW -->
+    <div id="viewSavedThreads" class="hidden">
+      <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1; display:flex; justify-content:space-between; align-items:center;">
+        <strong style="font-size:13px; color:#d35400;">★ Saved / Bookmarked Threads</strong>
+        <button onclick="navigateHome()">&laquo; Home</button>
+      </div>
+      <table class="forum-table">
+        <thead>
+          <tr>
+            <th>Thread Title</th>
+            <th style="width:130px;">Board</th>
+            <th style="width:80px; text-align:center;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="savedThreadsBody"></tbody>
+      </table>
+    </div>
+
     <!-- SEARCH RESULTS VIEW -->
     <div id="viewSearch" class="hidden">
       <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1;">
@@ -1583,6 +1604,7 @@
       <div style="padding: 8px 10px; background:#fff9f2; border-bottom:1px solid #f3dcd1; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
         <strong id="singleThreadTitle" style="font-size:13px; color:#d35400;">Thread Title</strong>
         <div style="display:flex; gap:6px; align-items:center;">
+          <button id="saveThreadBtn" type="button" onclick="toggleSaveCurrentThread()">☆ Save</button>
           <button id="jumpToReplyBtn" onclick="jumpToReplyBox()">&darr; Reply</button>
           <button onclick="openBoard(currentBoard)">&laquo; Back to Board</button>
         </div>
@@ -3839,7 +3861,7 @@
     }
 
     function switchView(viewId) {
-      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch', 'viewMemberList', 'viewAuthPortal', 'viewUserProfile', 'viewResetPassword'].forEach(id => {
+      ['viewIndex', 'viewBoard', 'viewThread', 'viewProfileEditor', 'viewInbox', 'viewSearch', 'viewMemberList', 'viewAuthPortal', 'viewUserProfile', 'viewResetPassword', 'viewSavedThreads'].forEach(id => {
         document.getElementById(id).classList.toggle('hidden', id !== viewId);
       });
     }
@@ -4190,6 +4212,94 @@
       loadShoutbox();
     }
 
+
+    function getSavedThreads(username) {
+      try {
+        const raw = localStorage.getItem('cantaloupe_saved_threads_' + username.toLowerCase());
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveThreadsList(username, list) {
+      try {
+        localStorage.setItem('cantaloupe_saved_threads_' + username.toLowerCase(), JSON.stringify(list));
+      } catch (e) {}
+    }
+
+    function updateSaveThreadButton() {
+      const btn = document.getElementById('saveThreadBtn');
+      if (!btn || !currentUser || !currentThread) return;
+      const myUname = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      const saved = getSavedThreads(myUname);
+      const isSaved = saved.some(item => item.id === currentThread.id);
+      btn.textContent = isSaved ? '★ Saved' : '☆ Save';
+      btn.classList.toggle('primary-btn', isSaved);
+    }
+
+    function toggleSaveCurrentThread() {
+      if (!currentUser || !currentThread) return;
+      const myUname = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      const saved = getSavedThreads(myUname);
+      const idx = saved.findIndex(item => item.id === currentThread.id);
+      if (idx !== -1) {
+        saved.splice(idx, 1);
+        showToast('Removed from Saved Threads.');
+      } else {
+        saved.unshift({
+          id: currentThread.id,
+          title: currentThread.title || 'Untitled Thread',
+          category: currentThread.category || ''
+        });
+        showToast('Thread bookmarked to ★ Saved!');
+      }
+      saveThreadsList(myUname, saved);
+      updateSaveThreadButton();
+    }
+
+    function openSavedThreads() {
+      if (!currentUser) { showAuthPortal(); return; }
+      switchView('viewSavedThreads');
+      document.getElementById('breadcrumbNav').innerHTML = `
+        <span><a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Home</a> &raquo; <b>★ Saved Threads</b></span>
+        <button onclick="openMemberList()" style="font-size:10px; padding:2px 6px;">MemberList</button>
+      `;
+      const myUname = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      const saved = getSavedThreads(myUname);
+      const tbody = document.getElementById('savedThreadsBody');
+      if (!saved || saved.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:18px; color:#7a7267;">No saved threads yet. Open any thread and tap ☆ Save!</td></tr>';
+        return;
+      }
+      tbody.innerHTML = saved.map((item, idx) => `
+        <tr class="${idx % 2 === 0 ? 'row-odd' : 'row-even'}">
+          <td><a href="javascript:void(0)" onclick="openThread(${item.id}, 1)">${escapeHtml(item.title)}</a></td>
+          <td>${escapeHtml(item.category)}</td>
+          <td style="text-align:center;"><button onclick="removeSavedThread(${item.id})">Remove</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function removeSavedThread(threadId) {
+      if (!currentUser) return;
+      const myUname = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      const saved = getSavedThreads(myUname).filter(item => item.id !== threadId);
+      saveThreadsList(myUname, saved);
+      openSavedThreads();
+    }
+
+    async function openRandomThread() {
+      if (!currentUser) { showAuthPortal(); return; }
+      const { data: threads } = await db.from('messages').select('id').limit(100);
+      if (!threads || threads.length === 0) {
+        showToast('No threads posted yet!');
+        return;
+      }
+      const pick = threads[Math.floor(Math.random() * threads.length)];
+      openThread(pick.id, 1);
+    }
+
     function toggleNewThreadForm() {
       document.getElementById('newThreadForm').classList.toggle('hidden');
     }
@@ -4296,6 +4406,7 @@
       currentBoard = thread.category;
 
       document.getElementById('singleThreadTitle').textContent = thread.title || 'Untitled Thread';
+      updateSaveThreadButton();
       document.getElementById('breadcrumbNav').innerHTML = `
         <span>
           <a href="javascript:void(0)" onclick="navigateHome()">Cantaloupe Chat Forum Index</a> &raquo; 
