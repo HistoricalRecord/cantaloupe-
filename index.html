@@ -919,6 +919,44 @@
     body.dark-mode .app-modal-body {
       color: #efe7de;
     }
+
+    /* Avatar Cropper */
+    .avatar-cropper-box {
+      margin: 10px 0;
+      padding: 10px;
+      border: 1px solid #e0b492;
+      background: #ffffff;
+      display: inline-block;
+      max-width: 100%;
+    }
+    body.dark-mode .avatar-cropper-box {
+      background: #1b1815;
+      border-color: #4a3b30;
+    }
+    .avatar-crop-canvas {
+      width: 200px;
+      height: 200px;
+      border: 2px solid #e67e22;
+      cursor: grab;
+      display: block;
+      touch-action: none;
+      background: #fff9f2;
+    }
+    .avatar-crop-canvas:active { cursor: grabbing; }
+    .crop-controls {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+    }
+    .crop-control-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .crop-control-row label { width: 55px; font-weight: bold; }
+    .crop-control-row input[type="range"] { flex: 1; padding: 0; border: none; }
   </style>
 </head>
 <body>
@@ -1144,11 +1182,34 @@
       <div class="form-box-body">
         <div style="margin-bottom: 10px;">
           <label><b>Current Avatar:</b></label><br/>
-          <img id="editProfileAvatarPreview" src="" alt="Avatar preview" style="width:80px; height:80px; object-fit:cover; border:1px solid #d3a081; margin-top:4px;" />
+          <img id="editProfileAvatarPreview" src="" alt="Avatar preview" class="hidden" style="width:80px; height:80px; object-fit:cover; border:1px solid #d3a081; margin-top:4px;" />
+          <div id="editProfileAvatarPlaceholder" class="profile-avatar-placeholder" style="width:80px; height:80px; font-size:28px; margin:4px 0 0 0;">?</div>
         </div>
         <div class="file-upload-row">
           <label><b>Upload New Avatar:</b></label>
-          <input type="file" id="editAvatarFileInput" accept="image/*" />
+          <input type="file" id="editAvatarFileInput" accept="image/*" onchange="handleAvatarFileSelect(event)" />
+        </div>
+        <div id="avatarCropperBox" class="avatar-cropper-box hidden">
+          <div style="font-size:11px; font-weight:bold; margin-bottom:6px; color:#d35400;">Crop Profile Picture (Drag image or use sliders)</div>
+          <canvas id="avatarCropCanvas" width="256" height="256" class="avatar-crop-canvas"></canvas>
+          <div class="crop-controls">
+            <div class="crop-control-row">
+              <label for="cropZoomSlider">Zoom:</label>
+              <input type="range" id="cropZoomSlider" min="1" max="3" step="0.05" value="1" oninput="updateCropFromSliders()" />
+            </div>
+            <div class="crop-control-row">
+              <label for="cropXSlider">Left/Right:</label>
+              <input type="range" id="cropXSlider" min="-150" max="150" step="1" value="0" oninput="updateCropFromSliders()" />
+            </div>
+            <div class="crop-control-row">
+              <label for="cropYSlider">Up/Down:</label>
+              <input type="range" id="cropYSlider" min="-150" max="150" step="1" value="0" oninput="updateCropFromSliders()" />
+            </div>
+            <div style="display:flex; gap:6px; margin-top:2px;">
+              <button type="button" onclick="resetAvatarCrop()">Reset Crop</button>
+              <button type="button" onclick="cancelAvatarUpload()">Cancel Image</button>
+            </div>
+          </div>
         </div>
         <div style="margin-top: 8px;">
           <label for="editBioInput"><b>Profile Status / Bio (Under Pic):</b></label>
@@ -1347,6 +1408,7 @@
     let onlineUsernames = new Set();
     let onlineGuestsCount = 0;
     let userProfiles = {};
+    let userIdToUsername = {};
     let ignoredUsers = new Set();
     let globalPostCounts = {};
     let allLoadedPosts = [];
@@ -1590,6 +1652,7 @@
           ? `thread "${(myThreadMap[v.target_id] || 'Thread').slice(0, 35)}"`
           : `reply in Thread #${threadId}`;
         const voteKey = `vote-${v.id}-${v.vote_type}`;
+        const voterName = userIdToUsername[v.user_id] || 'Someone';
         return {
           key: voteKey,
           type: 'vote',
@@ -1598,7 +1661,7 @@
           targetType: v.target_type,
           targetId: v.target_id,
           threadId: threadId,
-          text: `Someone ${isUp ? 'upvoted' : 'downvoted'} your ${label}`,
+          text: `${voterName} ${isUp ? 'upvoted' : 'downvoted'} your ${label}`,
           created_at: v.created_at || new Date().toISOString(),
           unread: !seenVotes.has(voteKey)
         };
@@ -1853,8 +1916,10 @@
               const { data: targetPost } = await db.from(table).select(cols).eq('id', v.target_id).maybeSingle();
               if (targetPost && targetPost.user_id === currentUser.id) {
                 const threadId = v.target_type === 'message' ? targetPost.id : targetPost.thread_id;
+                await loadProfiles();
                 loadNotifications();
-                const label = v.vote_type === 1 ? '▲ Someone upvoted your post!' : '▼ Someone downvoted your post!';
+                const voterName = userIdToUsername[v.user_id] || 'Someone';
+                const label = v.vote_type === 1 ? `▲ ${voterName} upvoted your post!` : `▼ ${voterName} downvoted your post!`;
                 showToast(`${label} Click to view.`, () => openThread(threadId, 1, true, { type: v.target_type, id: v.target_id }));
               }
             }
@@ -1952,11 +2017,14 @@
     }
 
     async function loadProfiles() {
-      const { data } = await db.from('profiles').select('username, avatar_url, bio, signature, custom_title, is_admin');
+      const { data } = await db.from('profiles').select('*');
       if (data) {
         userProfiles = {};
+        userIdToUsername = {};
         data.forEach(p => {
           if (p.username) {
+            if (p.id) userIdToUsername[p.id] = p.username;
+            if (p.user_id) userIdToUsername[p.user_id] = p.username;
             userProfiles[p.username.toLowerCase()] = {
               username: p.username,
               avatar_url: p.avatar_url || '',
@@ -2070,12 +2138,19 @@
         return;
       }
 
+      if (!currentUser) {
+        showToast('Please log in to edit posts.');
+        return;
+      }
       const table = targetType === 'message' ? 'messages' : 'replies';
-      const { error } = await db.from(table).update({ message: newContent }).eq('id', id);
+      const { data, error } = await db.from(table).update({ message: newContent }).eq('id', id).select();
 
       if (error) {
         showToast('Error updating post: ' + error.message);
+      } else if (!data || data.length === 0) {
+        showToast('Could not save edit (check Supabase UPDATE policy for this table).');
       } else {
+        showToast('Post updated.');
         openThread(currentThread.id, currentThreadPage, false);
       }
     }
@@ -2127,7 +2202,23 @@
         const profile = userProfiles[username.toLowerCase()] || {};
         document.getElementById('editBioInput').value = profile.bio || '';
         document.getElementById('editSignatureInput').value = profile.signature || '';
-        document.getElementById('editProfileAvatarPreview').src = profile.avatar_url || '';
+        const prevImg = document.getElementById('editProfileAvatarPreview');
+        const prevPh = document.getElementById('editProfileAvatarPlaceholder');
+        prevPh.textContent = username.charAt(0).toUpperCase();
+        if (profile.avatar_url) {
+          prevImg.src = profile.avatar_url;
+          prevImg.classList.remove('hidden');
+          prevPh.classList.add('hidden');
+          prevImg.onerror = () => {
+            prevImg.classList.add('hidden');
+            prevPh.classList.remove('hidden');
+          };
+        } else {
+          prevImg.removeAttribute('src');
+          prevImg.classList.add('hidden');
+          prevPh.classList.remove('hidden');
+        }
+        cancelAvatarUpload();
 
         const myPostCount = globalPostCounts[username.toLowerCase()] || 0;
         const customTitleRow = document.getElementById('customTitleRow');
@@ -2138,6 +2229,129 @@
           customTitleRow.style.display = 'none';
         }
       }
+    }
+
+
+    let cropImageObj = null;
+    let cropZoom = 1;
+    let cropOffsetX = 0;
+    let cropOffsetY = 0;
+    let isDraggingCrop = false;
+    let cropDragStartX = 0;
+    let cropDragStartY = 0;
+
+    function handleAvatarFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          cropImageObj = img;
+          resetAvatarCrop();
+          document.getElementById('avatarCropperBox').classList.remove('hidden');
+          initCropCanvasDrag();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function resetAvatarCrop() {
+      cropZoom = 1;
+      cropOffsetX = 0;
+      cropOffsetY = 0;
+      document.getElementById('cropZoomSlider').value = '1';
+      document.getElementById('cropXSlider').value = '0';
+      document.getElementById('cropYSlider').value = '0';
+      drawAvatarCrop();
+    }
+
+    function cancelAvatarUpload() {
+      cropImageObj = null;
+      const fi = document.getElementById('editAvatarFileInput');
+      if (fi) fi.value = '';
+      const box = document.getElementById('avatarCropperBox');
+      if (box) box.classList.add('hidden');
+    }
+
+    function updateCropFromSliders() {
+      cropZoom = parseFloat(document.getElementById('cropZoomSlider').value) || 1;
+      cropOffsetX = parseFloat(document.getElementById('cropXSlider').value) || 0;
+      cropOffsetY = parseFloat(document.getElementById('cropYSlider').value) || 0;
+      drawAvatarCrop();
+    }
+
+    function drawAvatarCrop() {
+      const canvas = document.getElementById('avatarCropCanvas');
+      if (!canvas || !cropImageObj) return;
+      const ctx = canvas.getContext('2d');
+      const size = canvas.width;
+      ctx.clearRect(0, 0, size, size);
+
+      const baseScale = Math.max(size / cropImageObj.width, size / cropImageObj.height);
+      const drawW = cropImageObj.width * baseScale * cropZoom;
+      const drawH = cropImageObj.height * baseScale * cropZoom;
+      const x = (size - drawW) / 2 + cropOffsetX;
+      const y = (size - drawH) / 2 + cropOffsetY;
+
+      ctx.drawImage(cropImageObj, x, y, drawW, drawH);
+
+      const prevImg = document.getElementById('editProfileAvatarPreview');
+      const prevPh = document.getElementById('editProfileAvatarPlaceholder');
+      if (prevImg && prevPh) {
+        prevImg.src = canvas.toDataURL('image/png');
+        prevImg.classList.remove('hidden');
+        prevPh.classList.add('hidden');
+      }
+    }
+
+    function initCropCanvasDrag() {
+      const canvas = document.getElementById('avatarCropCanvas');
+      if (!canvas || canvas.dataset.dragInit) return;
+      canvas.dataset.dragInit = '1';
+
+      const startDrag = (clientX, clientY) => {
+        isDraggingCrop = true;
+        cropDragStartX = clientX;
+        cropDragStartY = clientY;
+      };
+      const moveDrag = (clientX, clientY) => {
+        if (!isDraggingCrop) return;
+        const dx = clientX - cropDragStartX;
+        const dy = clientY - cropDragStartY;
+        cropDragStartX = clientX;
+        cropDragStartY = clientY;
+        cropOffsetX = Math.max(-150, Math.min(150, cropOffsetX + dx));
+        cropOffsetY = Math.max(-150, Math.min(150, cropOffsetY + dy));
+        document.getElementById('cropXSlider').value = String(Math.round(cropOffsetX));
+        document.getElementById('cropYSlider').value = String(Math.round(cropOffsetY));
+        drawAvatarCrop();
+      };
+      const endDrag = () => { isDraggingCrop = false; };
+
+      canvas.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY));
+      window.addEventListener('mousemove', (e) => moveDrag(e.clientX, e.clientY));
+      window.addEventListener('mouseup', endDrag);
+
+      canvas.addEventListener('touchstart', (e) => {
+        if (e.touches[0]) startDrag(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: true });
+      canvas.addEventListener('touchmove', (e) => {
+        if (isDraggingCrop && e.touches[0]) {
+          e.preventDefault();
+          moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: false });
+      canvas.addEventListener('touchend', endDrag);
+    }
+
+    function getCroppedAvatarBlob() {
+      return new Promise((resolve) => {
+        const canvas = document.getElementById('avatarCropCanvas');
+        if (!canvas || !cropImageObj) { resolve(null); return; }
+        canvas.toBlob((blob) => resolve(blob), 'image/png');
+      });
     }
 
     async function saveProfileChanges() {
@@ -2162,7 +2376,17 @@
 
       try {
         let avatarUrl = userProfiles[lKey]?.avatar_url || '';
-        if (file) {
+        if (cropImageObj) {
+          status.textContent = 'Uploading cropped avatar...';
+          const croppedBlob = await getCroppedAvatarBlob();
+          if (croppedBlob) {
+            const fileName = `avatars/${currentUser.id}-${Date.now()}.png`;
+            const { error: uploadError } = await db.storage.from(BUCKET_NAME).upload(fileName, croppedBlob, { upsert: true, contentType: 'image/png' });
+            if (uploadError) throw uploadError;
+            const { data: pubData } = db.storage.from(BUCKET_NAME).getPublicUrl(fileName);
+            if (pubData?.publicUrl) avatarUrl = pubData.publicUrl;
+          }
+        } else if (file) {
           status.textContent = 'Uploading new avatar...';
           const urls = await uploadMultipleImages(fileInput, 'avatars');
           if (urls.length > 0) avatarUrl = urls[0];
@@ -2559,17 +2783,24 @@
         
       if (!(await openAppConfirm(confirmMsg, 'Delete Post'))) return;
 
+      if (type === 'message') {
+        try { await db.from('replies').delete().eq('thread_id', id); } catch (e) {}
+      }
+
       const table = type === 'message' ? 'messages' : 'replies';
-      const { error } = await db.from(table).delete().eq('id', id);
+      const { data, error } = await db.from(table).delete().eq('id', id).select();
 
       if (error) {
         showToast('Error deleting item: ' + error.message);
+      } else if (!data || data.length === 0) {
+        showToast('Could not delete post (check Supabase DELETE policy for this table).');
       } else {
         showToast('Item deleted successfully.');
         if (type === 'message') {
-          showIndex();
+          if (currentBoard) openBoard(currentBoard);
+          else showIndex();
         } else {
-          openThread(currentThread.id, currentThreadPage);
+          openThread(currentThread.id, currentThreadPage, false);
         }
       }
     }
@@ -3555,7 +3786,8 @@
           ? ` <button style="font-size:9px; padding:1px 4px;" onclick="openPrivateChat('${escapeHtml(uname)}')">PM</button>`
           : '';
 
-        const editBtn = (isAdmin || myUsername === lName)
+        const isPostOwner = currentUser && (p.user_id === currentUser.id || myUsername === lName);
+        const editBtn = (isAdmin || isPostOwner)
           ? ` <button style="font-size:9px; padding:1px 4px; background:#f39c12; color:#fff;" onclick="startEditingPost(${p.id}, '${p.targetType}', ${JSON.stringify(p.message)})">Edit</button>`
           : '';
 
@@ -3563,7 +3795,7 @@
           ? ` <button style="font-size:9px; padding:1px 4px; background:#f5b041; color:#fff;" onclick="toggleThreadLock(${p.id}, ${!thread.is_locked})">${thread.is_locked ? 'Unlock Thread' : 'Lock Thread'}</button>`
           : '';
 
-        const deleteBtn = (isAdmin || myUsername === lName)
+        const deleteBtn = (isAdmin || isPostOwner)
           ? ` <button style="font-size:9px; padding:1px 4px; background:#e74c3c; color:#fff;" onclick="deletePostItem(${p.id}, '${p.targetType}')">Delete</button>`
           : '';
 
